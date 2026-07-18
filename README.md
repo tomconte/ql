@@ -35,6 +35,10 @@ hello/            "Hello, World!" QDOS job — the template for new programs
 takeover/         bare-metal demo: seizes the machine from QDOS, bounces a
                   dot on the mode 4 screen with VBL sync (one-way — reset
                   to exit)
+sound_test/       takeover demo + music: same bouncing dot, plus a looping
+                  melody played by bit-banging the 8049 IPC directly
+                  (ipc_sound.asm: the low-level send/receive + beep/kill
+                  routines; sound_test.asm: frame-counted melody player)
 tools/
   mkqlpak.ps1     shared: adds the QDOS executable header + zips the .qlpak
 docs/             deep dives (see below)

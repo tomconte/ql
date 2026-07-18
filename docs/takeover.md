@@ -121,8 +121,11 @@ memory size or line stride.
 
 - **Keyboard/joystick/sound** live behind the 8049 IPC on a bit-banged
   serial link (`$18003`). QDOS talks to it via MT.IPCOM/SMS.HDOP; after
-  takeover you'd have to speak the IPC protocol yourself — doable, and
-  the usual way games read keys post-takeover. Deep dive for another day.
+  takeover you have to speak the IPC protocol yourself. **Sound is done**:
+  `sound_test/ipc_sound.asm` implements the link plus the sound commands
+  (protocol notes in its header), and `sound_test/sound_test.asm` drives a
+  frame-counted melody player from the VBL loop. Keyboard (IPC command 9,
+  keyrow) still pending — same link, same technique.
 - **Timing**: no scheduler means all timing comes from counting frames.
 - On real hardware and accurate emulators (Q-emuLator), microdrive access
   is impossible after takeover — load everything first.

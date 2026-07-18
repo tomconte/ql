@@ -1,0 +1,2 @@
+100 PRINT "Takeover + IPC melody -- reset or close the emulator to exit."
+110 EXEC flp1_sound_test_bin
