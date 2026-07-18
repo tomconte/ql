@@ -1,0 +1,8 @@
+# build outputs
+*_bin
+*.qlpak
+stage/
+
+# stray local files, not part of the project
+a.out
+sound_test

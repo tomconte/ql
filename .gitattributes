@@ -1,0 +1,5 @@
+# QDOS SuperBASIC boot files must stay LF-only; .QCF configs are CRLF.
+# (mkqlpak.ps1 also normalizes both at packaging time.)
+* text=auto
+boot text eol=lf
+*.QCF text eol=crlf

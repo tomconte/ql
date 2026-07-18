@@ -1,0 +1,3 @@
+100 PRINT "Starting Hello job..."
+110 EXEC_W flp1_hello_bin
+120 PRINT "Job finished."
