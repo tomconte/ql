@@ -1,0 +1,2 @@
+100 PRINT "Taking over the machine -- reset or close the emulator to exit."
+110 EXEC flp1_takeover_bin

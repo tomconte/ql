@@ -31,8 +31,12 @@ hello/            "Hello, World!" QDOS job — the template for new programs
   hello.asm       68008 source (QDOS job with its own console window)
   boot            SuperBASIC boot file that EXECs the binary (LF endings!)
   hello.QCF       Q-emuLator session config bundled into the package
-  mkqlpak.ps1     adds the QDOS executable header + zips the .qlpak
   Makefile        all / run / clean
+takeover/         bare-metal demo: seizes the machine from QDOS, bounces a
+                  dot on the mode 4 screen with VBL sync (one-way — reset
+                  to exit)
+tools/
+  mkqlpak.ps1     shared: adds the QDOS executable header + zips the .qlpak
 docs/             deep dives (see below)
 ```
 
@@ -43,6 +47,9 @@ docs/             deep dives (see below)
   console windows, dataspace.
 - [docs/qemulator.md](docs/qemulator.md) — the `.qlpak` package format, the
   `.QCF` config file, and the `]!QDOS File Header` executable prefix.
+- [docs/takeover.md](docs/takeover.md) — taking over the machine for games
+  and demos: TRAP #0 / supervisor mode, masking interrupts, VBL sync by
+  polling, and the mode 4 / mode 8 screen layouts.
 
 ## External references
 

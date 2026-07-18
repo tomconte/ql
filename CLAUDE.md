@@ -23,8 +23,9 @@ make run    # launch Q-emuLator with the package
 
 Assemble step is `vasmm68k_mot -m68008 -Fbin -o <name>_bin <name>.asm` —
 flat binary, PC-relative code only (no relocation). The packaging step
-(`mkqlpak.ps1`) prepends the 30-byte `]!QDOS File Header` carrying the
-QDOS file type and dataspace, then zips config + files into a `.qlpak`.
+(shared `tools/mkqlpak.ps1`, called by each project's Makefile) prepends
+the 30-byte `]!QDOS File Header` carrying the QDOS file type and
+dataspace, then zips config + files into a `.qlpak`.
 
 ## Hard-won rules — do not rediscover these
 
@@ -52,7 +53,13 @@ QDOS file type and dataspace, then zips config + files into a `.qlpak`.
 ## Conventions
 
 - New program = new top-level dir copied from `hello/` (asm + boot + QCF +
-  mkqlpak.ps1 + Makefile), binary named `<name>_bin` (QDOS style, no dots).
+  Makefile; change `NAME` in the Makefile), binary named `<name>_bin`
+  (QDOS style, no dots). Packaging is shared: `tools/mkqlpak.ps1`.
+- Hardware-takeover programs (games/demos) follow the sequence in
+  `docs/takeover.md`: TRAP #0 → `move.w #$2700,sr` → own supervisor
+  stack → poll `$18021` bit 3 for VBL. Takeover is one-way; QDOS calls
+  are forbidden afterwards. Hardware register facts come from the
+  Minerva sources `inc/mc` and `inc/pc` — same rule as trap codes.
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the
@@ -64,5 +71,7 @@ QDOS file type and dataspace, then zips config + files into a `.qlpak`.
   console channels, colours, dataspace.
 - `docs/qemulator.md` — `.qlpak`/`.QCF`/`]!QDOS File Header` formats,
   deployment, debugging tips.
+- `docs/takeover.md` — machine takeover for games/demos: supervisor mode,
+  interrupt masking, VBL polling, mode 4/8 screen memory layouts.
 - Background/scene notes live in the Obsidian vault:
   `C:\Users\tomco\OneDrive\Applications\remotely-save\Vault\Retro\QL\`
