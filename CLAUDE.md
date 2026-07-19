@@ -49,6 +49,11 @@ dataspace, then zips config + files into a `.qlpak`.
    full paths from build scripts.
 7. `label name conflicts with directive` warnings from vasm: avoid label
    names like `entry`, `list`, `end`.
+8. The IPC sound sources end with an `end` directive, which stops vasm
+   entirely — `include` them as the **last** line of the main source.
+9. Flat PIC binaries can't hold absolute pointers in data (`dc.l label`
+   is file-relative garbage at runtime) — initialize pointers at runtime
+   with `lea label(pc)` (see the melody player's `mel_state`).
 
 ## Conventions
 
@@ -60,6 +65,13 @@ dataspace, then zips config + files into a `.qlpak`.
   stack → poll `$18021` bit 3 for VBL. Takeover is one-way; QDOS calls
   are forbidden afterwards. Hardware register facts come from the
   Minerva sources `inc/mc` and `inc/pc` — same rule as trap codes.
+- Shared assembly sources live in `lib/` (included as
+  `../lib/<file>.asm`). Takeover programs use
+  `lib/ipc_sound_takeover.asm` for sound (no sysvar access — required
+  once $28000 is screen 1); QDOS-cohabiting programs use the original
+  `sound_test/ipc_sound.asm`. Double-buffered programs: `flip/` (mode 4)
+  and `flip8/` (mode 8) are the reference implementations — new work
+  copies whichever mode matches.
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the
