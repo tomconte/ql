@@ -50,7 +50,8 @@ flip8/            the same demo in mode 8: 256×256, all seven visible
 game8/            proto-game skeleton (mode 8): arrows move the player,
                   space fires a bolt with a laser sfx over the music —
                   keyboard read directly from the 8049 IPC, one KEYROW
-                  round trip per frame
+                  round trip per frame; blue playfield + replace-blit
+                  sprites put all eight mode 8 colours on screen at once
 lib/
   ipc_sound_takeover.asm  shared: IPC sound for takeover programs (the
                   sysvar-reading snd_clrint removed; original kept in
