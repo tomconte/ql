@@ -1,0 +1,2 @@
+100 PRINT "Game skeleton: arrows move, space fires. Reset/close to exit."
+110 EXEC flp1_game8_bin

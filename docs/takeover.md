@@ -158,11 +158,17 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
 
 - **Keyboard/joystick/sound** live behind the 8049 IPC on a bit-banged
   serial link (`$18003`). QDOS talks to it via MT.IPCOM/SMS.HDOP; after
-  takeover you have to speak the IPC protocol yourself. **Sound is done**:
-  `sound_test/ipc_sound.asm` implements the link plus the sound commands
-  (protocol notes in its header), and `sound_test/sound_test.asm` drives a
-  frame-counted melody player from the VBL loop. Keyboard (IPC command 9,
-  keyrow) still pending — same link, same technique.
+  takeover you speak the IPC protocol yourself — and both are now done.
+  **Sound**: `sound_test/ipc_sound.asm` (original) /
+  `lib/ipc_sound_takeover.asm` implement the link and the sound commands.
+  **Keyboard**: `lib/ipc_keys_takeover.asm` implements IPC command 9
+  (the KEYROW primitive: 4-bit row parameter, one byte of raw key state
+  back, ~16 bit transactions). `game8/` is the worked example: arrows +
+  space all live in matrix row 1 (bits: 0 Enter, 1 ←, 2 ↑, 3 Esc, 4 →,
+  5 \, 6 space, 7 ↓), so one read per frame covers full game input.
+  Beware: KEYROW is *physical* — letter keys move on AZERTY/QWERTZ
+  layouts; row 1 is layout-independent. Reading the link steals 8049
+  cycles from tone generation: slight warble on held notes is authentic.
 - **Timing**: no scheduler means all timing comes from counting frames.
 - On real hardware and accurate emulators (Q-emuLator), microdrive access
   is impossible after takeover — load everything first.

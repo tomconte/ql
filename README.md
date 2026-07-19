@@ -47,10 +47,16 @@ flip/             double-buffered takeover demo: ten 16×16 sprites + the
 flip8/            the same demo in mode 8: 256×256, all seven visible
                   colours, 8×16 sprites (visually square — mode 8 pixels
                   are double-wide); only the pixel-format code differs
+game8/            proto-game skeleton (mode 8): arrows move the player,
+                  space fires a bolt with a laser sfx over the music —
+                  keyboard read directly from the 8049 IPC, one KEYROW
+                  round trip per frame
 lib/
   ipc_sound_takeover.asm  shared: IPC sound for takeover programs (the
                   sysvar-reading snd_clrint removed; original kept in
                   sound_test/)
+  ipc_keys_takeover.asm   shared: IPC keyboard (command 9 / KEYROW);
+                  include after the sound lib
 tools/
   mkqlpak.ps1     shared: adds the QDOS executable header + zips the .qlpak
 docs/             deep dives (see below)

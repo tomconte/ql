@@ -49,8 +49,12 @@ dataspace, then zips config + files into a `.qlpak`.
    full paths from build scripts.
 7. `label name conflicts with directive` warnings from vasm: avoid label
    names like `entry`, `list`, `end`.
-8. The IPC sound sources end with an `end` directive, which stops vasm
-   entirely — `include` them as the **last** line of the main source.
+8. `sound_test/ipc_sound.asm` (the original) ends with an `end`
+   directive, which stops vasm entirely — include it as the **last**
+   line. The `lib/` variants have the `end` stripped so several can be
+   included; order matters: `ipc_sound_takeover.asm` first, then
+   `ipc_keys_takeover.asm` (it uses the sound lib's `ipc_nib` and
+   `ipc_rdbyte`).
 9. Flat PIC binaries can't hold absolute pointers in data (`dc.l label`
    is file-relative garbage at runtime) — initialize pointers at runtime
    with `lea label(pc)` (see the melody player's `mel_state`).
