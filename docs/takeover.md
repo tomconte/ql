@@ -117,6 +117,36 @@ the background colour and flashes subsequent pixels until the next F bit
 or end of line). Switching mode changes pixel addressing but not the
 memory size or line stride.
 
+## Double buffering with the second screen
+
+The ZX8301 has a dual-screen feature QDOS never used (it parked its
+system variables at $28000, exactly where screen 1 lives — manual §10.3).
+After a takeover the sysvars are dead weight, so both screens are usable:
+bit 7 of `$18063` selects the displayed base, $20000 (screen 0) or
+$28000 (screen 1). `flip/flip.asm` is the worked example:
+
+- Draw into the **back** buffer while the other is displayed; at VBL,
+  flip with a single register write (`$00` or `$80` in mode 4). Only
+  complete frames are ever shown — no tearing, however long drawing
+  takes (if it exceeds a frame you just flip at 25 Hz instead).
+- **Bookkeeping**: when a buffer becomes the back buffer again, its
+  contents are two frames old — each sprite keeps a previous-position
+  slot *per buffer* for erasing.
+- `$18063` is write-only: derive its value from your own state (the
+  flip demo keeps the back-buffer index in a register).
+- Claiming $28000 is a second point of no return, and anything that
+  still reads the sysvars must go: that's why `flip/` includes
+  `ipc_sound_takeover.asm`, a variant of the sound routines with the
+  `snd_clrint` sysvar access removed (it only existed for QDOS
+  cohabitation).
+- On a 128 K machine the two screens leave 64 K at $30000+ for program,
+  data and stack.
+- EXEC loads jobs from the top of RAM downward, so a small job never
+  lands in $28000–$2FFFF and PIC needs no load-address guard; a
+  paranoid program (or one loaded on a crowded 128 K machine) can check
+  its own address at startup and, being PIC, copy itself somewhere safe
+  with a plain loop.
+
 ## What you give up (future work)
 
 - **Keyboard/joystick/sound** live behind the 8049 IPC on a bit-banged

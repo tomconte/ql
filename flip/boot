@@ -1,0 +1,2 @@
+100 PRINT "Double-buffer takeover demo -- reset or close the emulator to exit."
+110 EXEC flp1_flip_bin

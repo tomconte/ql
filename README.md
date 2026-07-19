@@ -39,6 +39,12 @@ sound_test/       takeover demo + music: same bouncing dot, plus a looping
                   melody played by bit-banging the 8049 IPC directly
                   (ipc_sound.asm: the low-level send/receive + beep/kill
                   routines; sound_test.asm: frame-counted melody player)
+flip/             double-buffered takeover demo: ten 16×16 sprites + the
+                  melody, page-flipping between screen 0 ($20000) and
+                  screen 1 ($28000, the ex-sysvars area) at VBL — the
+                  tear-free way to draw scenes bigger than the blanking
+                  window (ipc_sound_takeover.asm: sound routines with the
+                  sysvar-reading snd_clrint removed)
 tools/
   mkqlpak.ps1     shared: adds the QDOS executable header + zips the .qlpak
 docs/             deep dives (see below)
