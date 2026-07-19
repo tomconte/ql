@@ -49,6 +49,14 @@ nspr        equ     11              ; 0 player, 1 bolt, 2..10 bouncers
 pl_speed    equ     2               ; player pixels/frame per held arrow
 bolt_speed  equ     6               ; bolt pixels/frame upward
 
+; headroom bar: the VBL wait loop counts its idle spins (one spin is a
+; fixed slice of unused frame budget) and a green bar at the bottom of
+; the screen shows last frame's count. Bar shrinking toward zero = frame
+; nearly over budget (the music slows at the same moment). Tune hb_shift
+; so the bar is near full width with the scene at rest.
+hb_y        equ     252             ; bar top line (2 rows tall)
+hb_shift    equ     5               ; idle count -> bar groups (max 64)
+
 ; colour plane patterns (F bits kept 0 -- no hardware flash)
 pat_g       equ     %10101010
 pat_r       equ     %10101010
@@ -213,6 +221,7 @@ frame_loop:
         dbf     d6,.bounce
 
 ; ----- draw everything into the back buffer, remember positions
+        bsr     draw_hbar           ; headroom bar first, sprites over it
         lea     sprites(pc),a5
         moveq   #nspr-1,d6
 .draw:  bsr     spr_draw
@@ -229,8 +238,12 @@ frame_loop:
         bsr     mel_tick            ; advance the melody (usually a no-op)
 
         move.b  #1<<pc__frame,pc_intr   ; ack frame interrupt
-.wait:  btst    #pc__frame,pc_intr     ; ...and wait for the next VBL
+        moveq   #0,d0               ; ...and count the idle spin until the
+.wait:  addq.l  #1,d0               ; next VBL: that's our headroom
+        btst    #pc__frame,pc_intr
         beq.s   .wait
+        lea     headroom(pc),a2
+        move.l  d0,(a2)
 
         move.w  d7,d0               ; flip: display the buffer just drawn
         ror.b   #1,d0
@@ -238,6 +251,37 @@ frame_loop:
         move.b  d0,mc_stat
         eori.w  #1,d7               ; other buffer becomes the back buffer
         bra     frame_loop
+
+; -------------------------------------------------------------- headroom bar
+; Draw last frame's idle count as a green bar into the back buffer (a4):
+; two rows at hb_y, scaled by hb_shift, clamped to the full 64 groups.
+; The unlit remainder is written black, so the bar self-erases.
+draw_hbar:
+        lea     headroom(pc),a1
+        move.l  (a1),d0
+        lsr.l   #hb_shift,d0
+        cmp.w   #64,d0
+        bls.s   .clip
+        moveq   #64,d0
+.clip:  lea     hb_y*scr_llen(a4),a0
+        moveq   #2-1,d3
+.row:   move.w  d0,d1               ; lit groups
+        moveq   #64,d2
+        sub.w   d0,d2               ; dark groups
+        tst.w   d1
+        beq.s   .dark
+        subq.w  #1,d1
+.lit:   move.b  #pat_g,(a0)+        ; green
+        clr.b   (a0)+
+        dbf     d1,.lit
+.dark:  tst.w   d2
+        beq.s   .next
+        subq.w  #1,d2
+.drk:   clr.b   (a0)+
+        clr.b   (a0)+
+        dbf     d2,.drk
+.next:  dbf     d3,.row             ; 128 bytes written = already next line
+        rts
 
 ; ------------------------------------------------------------- melody player
 mel_tick:
@@ -361,6 +405,8 @@ spr_move:
 kbd_prev:
         dc.b    0                   ; row-1 bits from the previous frame
         even
+headroom:
+        dc.l    0                   ; idle spins in last frame's VBL wait
 mel_state:
         dc.w    0                   ; frames left (armed at runtime)
         dc.l    0                   ; pointer to next event (set at runtime)

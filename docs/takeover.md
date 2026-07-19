@@ -142,6 +142,11 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
   overran the VBL — flips silently halved to 25 Hz while looking fluid,
   and the frame-counted music dropped to half tempo. The melody *is* the
   overrun detector; when it drags, the frame is over budget.
+- **Measuring headroom**: the ST border-colour trick has no QL analogue
+  (the 8301 has no colour registers), and mid-frame register splits need
+  a scanline-accurate renderer. The portable equivalent: count the idle
+  spins of the VBL wait loop and draw the count as a bar (game8's green
+  bottom bar, `draw_hbar`). Bar toward zero = frame nearly over budget.
 - **Bookkeeping**: when a buffer becomes the back buffer again, its
   contents are two frames old — each sprite keeps a previous-position
   slot *per buffer* for erasing.
