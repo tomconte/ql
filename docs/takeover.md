@@ -154,6 +154,13 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
   after an overrun discards the missed VBL, waits for the next one
   (hard-halving to 25 Hz), and shows a lying half-full bar measuring
   "time to next VBL" instead of headroom.
+- **Calibration data** (game8, Q-emuLator at QL speed): a fully idle
+  frame spins the wait loop only ~1000× — video-RAM contention roughly
+  doubles naive 68008 cycle estimates, since code executes from the
+  contended on-board RAM. One keyboard read + the bar draw barely dent
+  the frame. A sustained note costs nothing per frame; a beep *transfer*
+  (~2 ms) is a clearly visible one-frame dip. game8 has `no_sprites` /
+  `no_music` build flags to isolate any of these live.
 - **Bookkeeping**: when a buffer becomes the back buffer again, its
   contents are two frames old — each sprite keeps a previous-position
   slot *per buffer* for erasing.

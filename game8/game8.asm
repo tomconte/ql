@@ -55,7 +55,21 @@ bolt_speed  equ     6               ; bolt pixels/frame upward
 ; nearly over budget (the music slows at the same moment). Tune hb_shift
 ; so the bar is near full width with the scene at rest.
 hb_y        equ     252             ; bar top line (2 rows tall)
-hb_shift    equ     5               ; idle count -> bar groups (max 64)
+hb_shift    equ     4               ; idle count -> bar groups (max 64);
+                                    ; calibrated: a fully idle frame spins
+                                    ; ~1000x (video contention roughly
+                                    ; doubles the naive cycle estimate),
+                                    ; showing ~62 of 64 groups
+no_sprites  equ     0               ; 1 = skip sprite erase/draw entirely:
+                                    ; gauge calibration (input, melody and
+                                    ; the bar itself keep running)
+no_music    equ     0               ; 1 = skip the melody player. Measured
+                                    ; (Q-emuLator): sustained notes add no
+                                    ; per-frame cost -- music's only cost is
+                                    ; the ~2 ms beep transfer per note, a
+                                    ; visible one-frame dip of the bar (try
+                                    ; space-fire). Real HW may differ (the
+                                    ; 8049 also synthesizes the tone).
 
 ; colour plane patterns (F bits kept 0 -- no hardware flash)
 pat_g       equ     %10101010
@@ -145,11 +159,13 @@ frame_loop:
         beq.s   .bb0
         lea     scr1,a4
 .bb0:
+        ifeq    no_sprites
         lea     sprites(pc),a5      ; pass 1: erase every sprite from the
         moveq   #nspr-1,d6          ; back buffer (positions of 2 frames ago)
 .erase: bsr     spr_erase
         lea     spr_size(a5),a5
         dbf     d6,.erase
+        endc
 
 ; ----- input: one IPC round trip for arrows + space
         moveq   #key_row1,d0
@@ -222,6 +238,7 @@ frame_loop:
 
 ; ----- draw everything into the back buffer, remember positions
         bsr     draw_hbar           ; headroom bar first, sprites over it
+        ifeq    no_sprites
         lea     sprites(pc),a5
         moveq   #nspr-1,d6
 .draw:  bsr     spr_draw
@@ -234,8 +251,11 @@ frame_loop:
         move.w  spr_y(a5),(a1)
         lea     spr_size(a5),a5
         dbf     d6,.draw
+        endc
 
+        ifeq    no_music
         bsr     mel_tick            ; advance the melody (usually a no-op)
+        endc
 
 ; ----- sync: honest headroom accounting. If the frame bit is ALREADY
 ; pending, a VBL fired during processing: we overran. Report zero and
