@@ -136,6 +136,12 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
   flip with a single register write (`$00` or `$80` in mode 4). Only
   complete frames are ever shown — no tearing, however long drawing
   takes (if it exceeds a frame you just flip at 25 Hz instead).
+- **Budget reality check** (measured in game8): OR-blitting eleven
+  8×16 mode 8 sprites (erase + draw) fits a 50 Hz frame on a stock-speed
+  QL; switching the same scene to replace-blit (~2× the byte traffic)
+  overran the VBL — flips silently halved to 25 Hz while looking fluid,
+  and the frame-counted music dropped to half tempo. The melody *is* the
+  overrun detector; when it drags, the frame is over budget.
 - **Bookkeeping**: when a buffer becomes the back buffer again, its
   contents are two frames old — each sprite keeps a previous-position
   slot *per buffer* for erasing.

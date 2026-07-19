@@ -10,19 +10,12 @@
 ;   space       fire: launches the cyan bolt upward with a laser sweep
 ;               that briefly takes over the sound channel from the melody
 ;
-; The bolt "rides" hidden inside the player when idle (the player is drawn
-; after it and covers it), launches on an edge-triggered space press, and
-; returns to riding when it leaves the top of the screen.
+; The bolt "rides" hidden inside the player when idle (drawn after it,
+; white ORs over cyan), launches from there on an edge-triggered space
+; press, and returns to riding when it leaves the top of the screen.
 ;
 ; Sprite records grew a height field (spr_hgt, stores rows-1) so the bolt
 ; can be 8x6 while player/bouncers are 8x16.
-;
-; Rendering shows ALL EIGHT mode 8 colours at once: black is invisible on
-; a black background (and there is no ninth colour to stand on), so the
-; playfield is BLUE and sprites REPLACE pixels instead of OR-ing onto
-; them -- erase restores the blue, draw clears then sets within the edge
-; masks. Replace-blitting also means overlaps layer cleanly by draw
-; order: bouncers first, then the bolt, then the player on top.
 ;
 ; Assemble: vasmm68k_mot -m68008 -Fbin -o game8_bin game8.asm
 
@@ -51,10 +44,7 @@ spr_px      equ     10              ; previous position per buffer:
 spr_hgt     equ     18              ; height in rows, stored as rows-1
 spr_size    equ     20
 
-nspr        equ     11              ; 0..8 bouncers, 9 bolt, 10 player
-nbounce     equ     9               ; (draw order = record order = depth)
-bolt_rec    equ     9*spr_size
-pl_rec      equ     10*spr_size
+nspr        equ     11              ; 0 player, 1 bolt, 2..10 bouncers
 
 pl_speed    equ     2               ; player pixels/frame per held arrow
 bolt_speed  equ     6               ; bolt pixels/frame upward
@@ -63,9 +53,6 @@ bolt_speed  equ     6               ; bolt pixels/frame upward
 pat_g       equ     %10101010
 pat_r       equ     %10101010
 pat_b       equ     %01010101
-
-bg_rpat     equ     pat_b           ; playfield: blue (green plane stays 0)
-bg_fill     equ     $00550055       ; the same as a long for screen clears
 
 ; sprite <x>,<y>,<dx>,<dy>,<gpat>,<rpat>,<height> -- one sprite record
 sprite      macro
@@ -119,9 +106,9 @@ main:
 
         move.b  #mc__m256,mc_stat   ; mode 8, screen 0 displayed
 
-        lea     scr0,a0             ; fill BOTH screens ($20000-$2FFFF)
-        move.w  #$10000/4-1,d0      ; with the blue playfield
-        move.l  #bg_fill,d1
+        lea     scr0,a0             ; clear BOTH screens ($20000-$2FFFF)
+        move.w  #$10000/4-1,d0
+        moveq   #0,d1
 .clr:   move.l  d1,(a0)+
         dbf     d0,.clr
 
@@ -163,8 +150,8 @@ frame_loop:
         move.b  (a2),d3             ; previous frame's bits (edge detect)
         move.b  d0,(a2)
 
-; ----- player (last record, drawn on top): held arrows move, clamped
-        lea     sprites+pl_rec(pc),a5
+; ----- player (record 0): held arrows move, clamped to the screen
+        lea     sprites(pc),a5
         move.w  spr_x(a5),d2
         btst    #k1__left,d0
         beq.s   .nl
@@ -194,8 +181,8 @@ frame_loop:
         move.w  #sy_max,d2
 .ncb:   move.w  d2,spr_y(a5)
 
-; ----- bolt: rides the player until fired, then flies up
-        lea     sprites+bolt_rec(pc),a1
+; ----- bolt (record 1): rides the player until fired, then flies up
+        lea     spr_size(a5),a1
         tst.w   spr_dy(a1)
         bne.s   .flying
         move.w  spr_x(a5),spr_x(a1) ; idle: hidden inside the player
@@ -217,9 +204,9 @@ frame_loop:
 .fly:   move.w  d0,spr_y(a1)
 .boltdone:
 
-; ----- bouncers (records 0..8)
-        lea     sprites(pc),a5
-        moveq   #nbounce-1,d6
+; ----- bouncers (records 2..10)
+        lea     sprites+2*spr_size(pc),a5
+        moveq   #nspr-3,d6
 .bounce:
         bsr     spr_move
         lea     spr_size(a5),a5
@@ -296,47 +283,33 @@ spr_addr:
         not.b   d3
         rts
 
-; spr_draw: REPLACE-blit sprite (a5) into buffer a4 at its position.
-; Two passes (green plane then red): edge bytes are cleared with the
-; complement mask then OR'd with pattern&mask; the middle byte is a plain
-; write. Uses d0-d5/a0/a1 only.
+; spr_draw: draw sprite (a5) into buffer a4. Preserves d6.
 spr_draw:
+        move.w  d6,-(sp)
         move.w  spr_x(a5),d0
         move.w  spr_y(a5),d1
-        bsr     spr_addr            ; a0, d2 = m0, d3 = ~m0
-        movea.l a0,a1               ; keep the row base for the red pass
+        bsr     spr_addr
         move.b  spr_col(a5),d4      ; green-byte pattern
+        move.b  spr_col+1(a5),d5    ; red-byte pattern
         move.b  d2,d0
-        and.b   d4,d0               ; pattern & first mask
+        and.b   d4,d0               ; green, first group
         move.b  d3,d1
-        and.b   d4,d1               ; pattern & last mask
-        move.w  spr_hgt(a5),d5
-.grow:  and.b   d3,(a0)             ; first group: clear, then set
-        or.b    d0,(a0)
-        move.b  d4,2(a0)            ; middle group: plain replace
-        and.b   d2,4(a0)            ; last group: clear, then set
+        and.b   d4,d1               ; green, last group
+        and.b   d5,d2               ; red, first group
+        and.b   d5,d3               ; red, last group
+        move.w  spr_hgt(a5),d6
+.row:   or.b    d0,(a0)             ; green plane
+        or.b    d4,2(a0)
         or.b    d1,4(a0)
+        or.b    d2,1(a0)            ; red plane
+        or.b    d5,3(a0)
+        or.b    d3,5(a0)
         lea     scr_llen(a0),a0
-        dbf     d5,.grow
-        lea     1(a1),a0            ; red plane, same masks
-        move.b  spr_col+1(a5),d4
-        move.b  d2,d0
-        and.b   d4,d0
-        move.b  d3,d1
-        and.b   d4,d1
-        move.w  spr_hgt(a5),d5
-.rrow:  and.b   d3,(a0)
-        or.b    d0,(a0)
-        move.b  d4,2(a0)
-        and.b   d2,4(a0)
-        or.b    d1,4(a0)
-        lea     scr_llen(a0),a0
-        dbf     d5,.rrow
+        dbf     d6,.row
+        move.w  (sp)+,d6
         rts
 
-; spr_erase: restore the blue playfield over sprite (a5) at prev[d7].
-; Green background pattern is 0, so that pass is pure clears; the red
-; pass replace-blits the blue pattern.
+; spr_erase: clear sprite (a5) from buffer a4 at prev[d7] (both planes)
 spr_erase:
         move.w  d7,d1
         add.w   d1,d1
@@ -345,28 +318,16 @@ spr_erase:
         adda.w  d1,a1
         move.w  (a1)+,d0            ; prev x
         move.w  (a1),d1             ; prev y
-        bsr     spr_addr            ; a0, d2 = m0, d3 = ~m0
-        movea.l a0,a1
+        bsr     spr_addr
         move.w  spr_hgt(a5),d5
-.grow:  and.b   d3,(a0)             ; green plane: background is 0
+.row:   and.b   d3,(a0)             ; first group: keep ~mask
+        and.b   d3,1(a0)
         clr.b   2(a0)
-        and.b   d2,4(a0)
+        clr.b   3(a0)
+        and.b   d2,4(a0)            ; last group: keep mask
+        and.b   d2,5(a0)
         lea     scr_llen(a0),a0
-        dbf     d5,.grow
-        lea     1(a1),a0            ; red plane: restore blue
-        move.b  #bg_rpat,d4
-        move.b  d2,d0
-        and.b   d4,d0
-        move.b  d3,d1
-        and.b   d4,d1
-        move.w  spr_hgt(a5),d5
-.rrow:  and.b   d3,(a0)
-        or.b    d0,(a0)
-        move.b  d4,2(a0)
-        and.b   d2,4(a0)
-        or.b    d1,4(a0)
-        lea     scr_llen(a0),a0
-        dbf     d5,.rrow
+        dbf     d5,.row
         rts
 
 ; spr_move: step sprite (a5), reflecting off the screen edges
@@ -448,21 +409,21 @@ melody:
         rest    qn                  ; breathe, then loop
         dc.w    0                   ; end of melody: player restarts
 
-; nine bouncers first (depth order), then the bolt, then the player on
-; top. With the blue playfield, every mode 8 colour is on screen: blue
-; background + black/red/magenta/green/cyan/yellow/white sprites.
+; player, bolt, then nine bouncers covering all seven visible colours
+; (black is the background; on-black OR-blitting cannot show a black
+; sprite, and that is fine)
 sprites:
-        sprite  240,16,  -1,2,  0,0,               16  ; black
-        sprite  20,180,  3,-1,  0,pat_r,           16  ; red
-        sprite  150,60,  -2,-2, 0,pat_r|pat_b,     16  ; magenta
-        sprite  100,120, 1,3,   pat_g,0,           16  ; green
-        sprite  60,200,  -3,1,  pat_g,pat_b,       16  ; cyan
-        sprite  210,190, 2,-3,  pat_g,pat_r,       16  ; yellow
-        sprite  130,30,  -1,-1, pat_g,pat_r|pat_b, 16  ; white
-        sprite  30,90,   3,2,   pat_g,0,           16  ; green
-        sprite  175,150, -2,3,  0,pat_r,           16  ; red
-        sprite  124,224, 0,0,   pat_g,pat_b,       6   ; bolt, cyan
         sprite  124,224, 0,0,   pat_g,pat_r|pat_b, 16  ; player, white
+        sprite  124,224, 0,0,   pat_g,pat_b,       6   ; bolt, cyan
+        sprite  240,16,  -1,2,  pat_g,pat_r,       16  ; yellow
+        sprite  20,180,  3,-1,  pat_g,0,           16  ; green
+        sprite  150,60,  -2,-2, pat_g,pat_b,       16  ; cyan
+        sprite  100,120, 1,3,   0,pat_r,           16  ; red
+        sprite  60,200,  -3,1,  0,pat_r|pat_b,     16  ; magenta
+        sprite  210,190, 2,-3,  0,pat_b,           16  ; blue
+        sprite  130,30,  -1,-1, pat_g,pat_r|pat_b, 16  ; white
+        sprite  30,90,   3,2,   0,pat_b,           16  ; blue
+        sprite  175,150, -2,3,  0,pat_r,           16  ; red
 
         even
 sv_stack:
