@@ -85,3 +85,10 @@ Q-emuLator's own packages use.
   by hand.
 - Q-emuLator ships a 68k debugger DLL (`debug_68k.dll`, manual:
   `docs\debug_68k.pdf` in the install dir) for when things get serious.
+- **Timing model** (measured via game8's headroom gauge): `Speed=QL`
+  applies a uniform rate — per-region video-RAM contention is *not*
+  simulated. Moving code to uncontended expansion RAM (`Ram=640K`, job
+  loads high) changed nothing here, though it should help on real
+  hardware or an accurate FPGA clone. Performance conclusions from
+  Q-emuLator are therefore approximate; contention-sensitive
+  optimizations need real hardware to evaluate.
