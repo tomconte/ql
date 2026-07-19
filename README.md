@@ -43,8 +43,14 @@ flip/             double-buffered takeover demo: ten 16×16 sprites + the
                   melody, page-flipping between screen 0 ($20000) and
                   screen 1 ($28000, the ex-sysvars area) at VBL — the
                   tear-free way to draw scenes bigger than the blanking
-                  window (ipc_sound_takeover.asm: sound routines with the
-                  sysvar-reading snd_clrint removed)
+                  window
+flip8/            the same demo in mode 8: 256×256, all seven visible
+                  colours, 8×16 sprites (visually square — mode 8 pixels
+                  are double-wide); only the pixel-format code differs
+lib/
+  ipc_sound_takeover.asm  shared: IPC sound for takeover programs (the
+                  sysvar-reading snd_clrint removed; original kept in
+                  sound_test/)
 tools/
   mkqlpak.ps1     shared: adds the QDOS executable header + zips the .qlpak
 docs/             deep dives (see below)

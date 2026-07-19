@@ -6,9 +6,11 @@
 ; taken over with all interrupts masked, so snd_clrint -- whose only job was
 ; to clear the IPC level-2 interrupt for QDOS's handler, using QDOS's mask
 ; shadow at sysvar $35(a6) -- is gone, along with the a6 requirement. That
-; matters here because the flip demo reuses the sysvars area ($28000) as
-; screen 1. The example note/effect tables are dropped too; the melody
-; lives in the including file.
+; matters because the double-buffered demos reuse the sysvars area ($28000)
+; as screen 1. The example note/effect tables are dropped too; melodies
+; live in the including file. Shared by the flip/ and flip8/ projects
+; (include with "../lib/ipc_sound_takeover.asm" as the LAST line: the file
+; ends with an "end" directive).
 ;
 ; Protocol notes (see the original for the full story):
 ;   Send:    write %11d0 to $18003 (d = data bit, MSB first), then poll

@@ -117,6 +117,13 @@ the background colour and flashes subsequent pixels until the next F bit
 or end of line). Switching mode changes pixel addressing but not the
 memory size or line stride.
 
+`flip8/flip8.asm` is the worked port of the double-buffered demo: only
+`spr_addr` (4-pixel groups, 2 mask bits per pixel: `b = (x&3)*2`),
+`spr_draw` (per-plane byte *patterns* instead of plane flags — e.g.
+white = green byte `%10101010`, red byte `%11111111`) and a handful of
+constants differ from `flip/`. The mode bit must ride along in every
+`$18063` write, including the per-frame flip values (`$08`/`$88`).
+
 ## Double buffering with the second screen
 
 The ZX8301 has a dual-screen feature QDOS never used (it parked its
@@ -135,8 +142,8 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
 - `$18063` is write-only: derive its value from your own state (the
   flip demo keeps the back-buffer index in a register).
 - Claiming $28000 is a second point of no return, and anything that
-  still reads the sysvars must go: that's why `flip/` includes
-  `ipc_sound_takeover.asm`, a variant of the sound routines with the
+  still reads the sysvars must go: that's why the flip demos use
+  `lib/ipc_sound_takeover.asm`, a variant of the sound routines with the
   `snd_clrint` sysvar access removed (it only existed for QDOS
   cohabitation).
 - On a 128 K machine the two screens leave 64 K at $30000+ for program,

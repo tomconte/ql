@@ -1,0 +1,2 @@
+100 PRINT "MODE 8 double-buffer demo -- reset or close the emulator to exit."
+110 EXEC flp1_flip8_bin

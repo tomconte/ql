@@ -1,4 +1,4 @@
-NAME      := flip
+NAME      := flip8
 DATASPACE := 512
 VASM      := C:/Users/tomco/app/vasm/vasmm68k_mot.exe
 QEMU      := C:/Program Files (x86)/QemuLator/QemuLator 4/QemuLator.exe
