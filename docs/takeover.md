@@ -136,11 +136,12 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
   flip with a single register write (`$00` or `$80` in mode 4). Only
   complete frames are ever shown — no tearing, however long drawing
   takes (if it exceeds a frame you just flip at 25 Hz instead).
-- **Budget reality check** (measured in game8): OR-blitting eleven
-  8×16 mode 8 sprites (erase + draw) fits a 50 Hz frame on a stock-speed
-  QL; switching the same scene to replace-blit (~2× the byte traffic)
-  overran the VBL — flips silently halved to 25 Hz while looking fluid,
-  and the frame-counted music dropped to half tempo. The melody *is* the
+- **Budget reality check** (measured in game8, stock-speed QL):
+  OR-blitting eleven 8×16 mode 8 sprites plus a keyboard read sat right
+  at the edge of the 20 ms frame and tipped over it; eight sprites run
+  comfortably. Replace-blitting the same scene (~2× the byte traffic)
+  was far over. An overrun shows up as half-tempo frame-counted music
+  and half-speed motion while still looking fluid — the melody *is* an
   overrun detector; when it drags, the frame is over budget.
 - **Measuring headroom**: the ST border-colour trick has no QL analogue
   (the 8301 has no colour registers), and mid-frame register splits need
