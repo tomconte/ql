@@ -44,7 +44,7 @@ spr_px      equ     10              ; previous position per buffer:
 spr_hgt     equ     18              ; height in rows, stored as rows-1
 spr_size    equ     20
 
-nspr        equ     11              ; 0 player, 1 bolt, 2..10 bouncers
+nspr        equ     8               ; 0 player, 1 bolt, 2..7 bouncers
 
 pl_speed    equ     2               ; player pixels/frame per held arrow
 bolt_speed  equ     6               ; bolt pixels/frame upward
@@ -237,13 +237,19 @@ frame_loop:
 
         bsr     mel_tick            ; advance the melody (usually a no-op)
 
-        move.b  #1<<pc__frame,pc_intr   ; ack frame interrupt
-        moveq   #0,d0               ; ...and count the idle spin until the
-.wait:  addq.l  #1,d0               ; next VBL: that's our headroom
+; ----- sync: honest headroom accounting. If the frame bit is ALREADY
+; pending, a VBL fired during processing: we overran. Report zero and
+; carry on immediately (waiting for yet another edge would halve the
+; frame rate); otherwise count idle spins until the edge arrives.
+        moveq   #0,d0
+        btst    #pc__frame,pc_intr
+        bne.s   .late               ; missed the VBL: zero headroom
+.wait:  addq.l  #1,d0               ; count the idle spin = headroom
         btst    #pc__frame,pc_intr
         beq.s   .wait
-        lea     headroom(pc),a2
+.late:  lea     headroom(pc),a2
         move.l  d0,(a2)
+        move.b  #1<<pc__frame,pc_intr   ; ack, arming the next frame's test
 
         move.w  d7,d0               ; flip: display the buffer just drawn
         ror.b   #1,d0
@@ -455,9 +461,9 @@ melody:
         rest    qn                  ; breathe, then loop
         dc.w    0                   ; end of melody: player restarts
 
-; player, bolt, then nine bouncers covering all seven visible colours
-; (black is the background; on-black OR-blitting cannot show a black
-; sprite, and that is fine)
+; player, bolt, then six bouncers -- with the white player that covers
+; all seven visible colours (black is the background; on-black
+; OR-blitting cannot show a black sprite, and that is fine)
 sprites:
         sprite  124,224, 0,0,   pat_g,pat_r|pat_b, 16  ; player, white
         sprite  124,224, 0,0,   pat_g,pat_b,       6   ; bolt, cyan
@@ -467,9 +473,6 @@ sprites:
         sprite  100,120, 1,3,   0,pat_r,           16  ; red
         sprite  60,200,  -3,1,  0,pat_r|pat_b,     16  ; magenta
         sprite  210,190, 2,-3,  0,pat_b,           16  ; blue
-        sprite  130,30,  -1,-1, pat_g,pat_r|pat_b, 16  ; white
-        sprite  30,90,   3,2,   0,pat_b,           16  ; blue
-        sprite  175,150, -2,3,  0,pat_r,           16  ; red
 
         even
 sv_stack:

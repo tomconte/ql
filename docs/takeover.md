@@ -147,6 +147,12 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
   a scanline-accurate renderer. The portable equivalent: count the idle
   spins of the VBL wait loop and draw the count as a bar (game8's green
   bottom bar, `draw_hbar`). Bar toward zero = frame nearly over budget.
+  Crucial subtlety: test whether the frame bit is *already pending* at
+  the sync point — that means a VBL fired during processing (overrun),
+  so report zero and continue immediately. Naively ack-then-waiting
+  after an overrun discards the missed VBL, waits for the next one
+  (hard-halving to 25 Hz), and shows a lying half-full bar measuring
+  "time to next VBL" instead of headroom.
 - **Bookkeeping**: when a buffer becomes the back buffer again, its
   contents are two frames old — each sprite keeps a previous-position
   slot *per buffer* for erasing.
