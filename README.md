@@ -21,8 +21,19 @@ make run    # launch Q-emuLator with it (auto-boots and runs the job)
 make clean
 ```
 
-Close Q-emuLator before rebuilding — it keeps the `.qlpak` file locked
-while running.
+In `game8/` additionally:
+
+```
+make mdv    # build game8.mdv, a QLay-format Microdrive image (verified)
+make runmdv # boot it in Q-emuLator via the real QDOS mdv driver
+```
+
+The `.mdv` is the portable artifact: the same file boots in Q-emuLator,
+on the ZX Spectrum Next QL core (copy to SD card) and on a real QL with
+a vDriveQL.
+
+Close Q-emuLator before rebuilding — it keeps the `.qlpak` (and any
+mounted `.mdv`) locked while running.
 
 ## Layout
 
@@ -60,6 +71,8 @@ lib/
                   include after the sound lib
 tools/
   mkqlpak.ps1     shared: adds the QDOS executable header + zips the .qlpak
+  mkmdv.py        shared: builds + verifies QLay-format .mdv Microdrive
+                  images (Python 3, stdlib only)
 docs/             deep dives (see below)
 ```
 
@@ -73,6 +86,9 @@ docs/             deep dives (see below)
 - [docs/takeover.md](docs/takeover.md) — taking over the machine for games
   and demos: TRAP #0 / supervisor mode, masking interrupts, VBL sync by
   polling, and the mode 4 / mode 8 screen layouts.
+- [docs/mdv-format.md](docs/mdv-format.md) — the QLay `.mdv` container and
+  the QDOS Microdrive filesystem (sectors, checksums, map, directory),
+  established from the Minerva/QLay sources.
 
 ## External references
 

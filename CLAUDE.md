@@ -27,6 +27,14 @@ flat binary, PC-relative code only (no relocation). The packaging step
 the 30-byte `]!QDOS File Header` carrying the QDOS file type and
 dataspace, then zips config + files into a `.qlpak`.
 
+`make mdv` (game8, pattern reusable) builds `<name>.mdv` instead — a
+QLay-format Microdrive image via `tools/mkmdv.py` (Python 3, stdlib
+only; builds carry a genuine QDOS directory header with type 1 +
+dataspace). The `.mdv` boots in Q-emuLator (`make runmdv`,
+`Slot1=MDV: <path>` in a QCF), on the ZX Spectrum Next QL core and on a
+vDriveQL. `python tools/mkmdv.py --verify <image>` checks any image;
+format spec in `docs/mdv-format.md`.
+
 ## Hard-won rules — do not rediscover these
 
 1. **Executables need a dataspace.** A raw `-Fbin` output is not EXECable;
@@ -58,6 +66,15 @@ dataspace, then zips config + files into a `.qlpak`.
 9. Flat PIC binaries can't hold absolute pointers in data (`dc.l label`
    is file-relative garbage at runtime) — initialize pointers at runtime
    with `lea label(pc)` (see the melody player's `mel_state`).
+10. **Microdrive images: write every checksum correctly** (`$0f0f` +
+    byte sum, LSB first — Minerva `md/write.asm`). Wrong sector-header
+    checksums "work" under Q-emuLator's default driver, which hooks QDOS
+    above checksum level (Pitman.MDV's are all stale), but the real ROM
+    driver (`MdvImageDriver=QDOS`, hardware-level cores) silently skips
+    every sector that fails the comparator. Details: `docs/mdv-format.md`.
+11. Boot scripts use `EXEC mdv1_...`, not `flp1_`: Q-emuLator aliases
+    MDV1_/FLP1_/WIN1_ to the same slot, so mdv1_ works for qlpaks *and*
+    mdv images — flp1_ doesn't exist on a real QL or the Next core.
 
 ## Conventions
 
@@ -89,5 +106,7 @@ dataspace, then zips config + files into a `.qlpak`.
   deployment, debugging tips.
 - `docs/takeover.md` — machine takeover for games/demos: supervisor mode,
   interrupt masking, VBL polling, mode 4/8 screen memory layouts.
+- `docs/mdv-format.md` — QLay `.mdv` container + QDOS Microdrive
+  filesystem: sector/checksum layout, map, directory, sources.
 - Background/scene notes live in the Obsidian vault:
   `C:\Users\tomco\OneDrive\Applications\remotely-save\Vault\Retro\QL\`
