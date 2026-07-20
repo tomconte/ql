@@ -1,6 +1,7 @@
 # build outputs
 *_bin
 *.qlpak
+*.mdv
 stage/
 
 # stray local files, not part of the project
