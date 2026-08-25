@@ -21,9 +21,20 @@
 ; The line drawer is the BASELINE: classic Bresenham, correctness first
 ; but idiomatic -- endpoints swapped so x-major lines always step right
 ; and y-major lines always step down (3 inner loops), screen address and
-; bit mask kept incrementally, never recomputed per pixel. Optimized
-; variants (fixed-point slope, byte-combining, unrolling) come later and
-; are measured against this same rig.
+; bit mask kept incrementally, never recomputed per pixel.
+;
+; Round 2 adds the first optimized variant behind build flags:
+;   use_fast  dispatch shallow x-major lines (|dx| >= 2|dy|) to a
+;             byte-granular loop (xfast): per pixel only the error add
+;             and an untaken branch; pixels are written as run masks,
+;             once per byte or per row-run. Pixel placement is identical
+;             to the baseline, so the fan doubles as a regression test.
+;             Steeper lines keep the baseline loops -- a y-step forces a
+;             flush, and near-diagonal lines step every 1-2 pixels,
+;             where flush cost would lose to the plain loop.
+;   shallow   restrict the table to the 28 left/right-border lines (the
+;             fast path's slope class) to measure the class in isolation
+;             -- the full fan's slope mix dilutes it.
 ;
 ; Assemble: vasmm68k_mot -m68008 -Fbin -o lines_bin lines.asm
 
@@ -46,6 +57,11 @@ ro_x        equ     (192/8)*2                   ; byte offset of x=192
 ro_pix      equ     244*scr_llen+ro_x           ; pixels/frame counter
 ro_lin      equ     250*scr_llen+ro_x           ; lines/frame counter
 ro_cell     equ     %11111100                   ; 6 px block + 2 px gap
+
+use_fast    equ     1               ; 1 = dispatch shallow x-major lines
+                                    ; to the byte-granular fast path
+shallow     equ     0               ; 1 = table holds only the shallow
+                                    ; left/right-border lines
 
 avg_frames  equ     256             ; readout averaging window (power of 2).
 avg_shift   equ     8               ; 256 frames ~ 5 s per update: a window
@@ -157,7 +173,14 @@ draw_line:
         tst.w   d3
         bge.s   .sdn
         move.w  #-scr_llen,a1       ; ...or up
-.sdn:   lsl.w   #7,d1               ; y*128 (max 239*128, fits signed)
+.sdn:
+        ifne    use_fast
+        move.w  d5,d2               ; shallow (|dx| >= 2|dy|)? take the
+        add.w   d2,d2               ; byte-granular fast path
+        cmp.w   d2,d4
+        bge     xfast
+        endc
+        lsl.w   #7,d1               ; y*128 (max 239*128, fits signed)
         move.w  d0,d2
         lsr.w   #3,d2
         add.w   d2,d2               ; (x>>3)*2: green byte offset
@@ -247,6 +270,163 @@ ymajl:  neg.w   d2
         dbf     d0,.yl
         rts
 
+; ----- x-major fast path: shallow lines (|dx| >= 2|dy|), byte writes.
+; The trick: d4 holds the PENDING-RUN mask -- every pixel since the last
+; write, as a $ff>>s run. In the unrolled 8-pixel byte block the common
+; path per pixel is only the error add + an untaken bpl; the pixels
+; materialize when the run is flushed: at a y-step (out-of-line .st_
+; blocks below: pending & end-of-run mask -> old row, pending restarts
+; at the next slot) or at the byte end (whole pending, one or.b).
+; Lead-in and tail pixels around the byte-aligned middle reuse the
+; baseline per-pixel body, so pixel placement is IDENTICAL to the
+; baseline: the drawn fan must not change by a single pixel.
+        ifne    use_fast
+xfast:
+        lsl.w   #7,d1               ; address, as in the baseline
+        move.w  d0,d2
+        lsr.w   #3,d2
+        add.w   d2,d2
+        add.w   d2,d1
+        lea     (a4,d1.w),a0
+        and.w   #7,d0               ; d0 = p, bit position (0 = bit 7)
+        move.w  d4,d2               ; split T = |dx|+1 pixels into
+        addq.w  #1,d2               ; lead (to the byte boundary),
+        moveq   #8,d1               ; blocks of 8, tail
+        sub.w   d0,d1
+        and.w   #7,d1               ; lead = (8-p) & 7 ...
+        cmp.w   d2,d1
+        ble.s   .lok
+        move.w  d2,d1               ; ... clamped to T (tiny line)
+.lok:   sub.w   d1,d2               ; rest = T - lead
+        move.w  d2,d3
+        and.w   #7,d3
+        move.w  d3,-(sp)            ; push tail = rest & 7
+        lsr.w   #3,d2
+        move.w  d2,-(sp)            ; push blocks = rest >> 3
+        move.w  d1,-(sp)            ; push lead
+        moveq   #0,d1               ; account T pixels
+        move.w  d4,d1
+        addq.l  #1,d1
+        add.l   d1,d6
+        move.w  d4,d3
+        neg.w   d3                  ; d3 = err, starts at -|dx|
+        move.w  d4,d1
+        add.w   d1,d1               ; d1 = 2|dx| (error decrement)
+        move.w  d5,d2
+        add.w   d2,d2               ; d2 = 2|dy| (error increment)
+        move.b  #$80,d4
+        lsr.b   d0,d4               ; d4 = single-bit mask at p
+        move.w  (sp)+,d5            ; --- lead-in: baseline body
+        bra.s   .ltst
+.lpx:   or.b    d4,(a0)
+        add.w   d2,d3
+        bmi.s   .ln
+        adda.w  a1,a0
+        sub.w   d1,d3
+.ln:    ror.b   #1,d4               ; last lead pixel is at bit 0, so
+        bcc.s   .ltst               ; the final wrap advances a0 to the
+        addq.l  #2,a0               ; fresh byte for the blocks
+.ltst:  dbf     d5,.lpx
+
+        move.w  (sp)+,d5            ; --- middle: unrolled byte blocks
+        moveq   #-1,d4              ; pending run opens at slot 0
+        bra.s   .btst
+
+; y-step flushes for slots 0-3 (placed above the block: all the bpl.s
+; and bra.s stay in short range)
+.st0:   move.b  d4,d0
+        and.b   #$80,d0             ; pending & run-end-at-slot-0
+        or.b    d0,(a0)             ; write the run to the leaving row
+        move.b  #$7f,d4             ; pending reopens at slot 1
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r1
+.st1:   move.b  d4,d0
+        and.b   #$c0,d0
+        or.b    d0,(a0)
+        move.b  #$3f,d4
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r2
+.st2:   move.b  d4,d0
+        and.b   #$e0,d0
+        or.b    d0,(a0)
+        move.b  #$1f,d4
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r3
+.st3:   move.b  d4,d0
+        and.b   #$f0,d0
+        or.b    d0,(a0)
+        move.b  #$0f,d4
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r4
+
+.blk:   add.w   d2,d3               ; slot 0: err += 2|dy|, that is all
+        bpl.s   .st0
+.r1:    add.w   d2,d3               ; slot 1
+        bpl.s   .st1
+.r2:    add.w   d2,d3               ; slot 2
+        bpl.s   .st2
+.r3:    add.w   d2,d3               ; slot 3
+        bpl.s   .st3
+.r4:    add.w   d2,d3               ; slot 4
+        bpl.s   .st4
+.r5:    add.w   d2,d3               ; slot 5
+        bpl.s   .st5
+.r6:    add.w   d2,d3               ; slot 6
+        bpl.s   .st6
+.r7:    add.w   d2,d3               ; slot 7
+        bpl.s   .st7
+        or.b    d4,(a0)             ; no y-step left pending: one write
+        moveq   #-1,d4              ; for up to 8 pixels
+.bnx:   addq.l  #2,a0
+.btst:  dbf     d5,.blk
+
+        move.w  (sp)+,d5            ; --- tail: baseline body at p = 0
+        moveq   #-128,d4            ; bit 7 mask ($80)
+        bra.s   .ttst
+.tpx:   or.b    d4,(a0)
+        add.w   d2,d3
+        bmi.s   .tn
+        adda.w  a1,a0
+        sub.w   d1,d3
+.tn:    ror.b   #1,d4
+        bcc.s   .ttst
+        addq.l  #2,a0
+.ttst:  dbf     d5,.tpx
+        rts
+
+; y-step flushes for slots 4-7 (below: still in short range)
+.st4:   move.b  d4,d0
+        and.b   #$f8,d0
+        or.b    d0,(a0)
+        move.b  #$07,d4
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r5
+.st5:   move.b  d4,d0
+        and.b   #$fc,d0
+        or.b    d0,(a0)
+        move.b  #$03,d4
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r6
+.st6:   move.b  d4,d0
+        and.b   #$fe,d0
+        or.b    d0,(a0)
+        move.b  #$01,d4
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .r7
+.st7:   or.b    d4,(a0)             ; run end = whole pending: no and
+        moveq   #-1,d4              ; next block opens a fresh run
+        adda.w  a1,a0
+        sub.w   d1,d3
+        bra.s   .bnx                ; block's write already done
+        endc
+
 ; ------------------------------------------------------------ binary readout
 ; draw_readout: value d0.w as 16 cells at green-plane address a0, MSB
 ; first; two value rows, then a dashed ruler row marking the cells.
@@ -273,12 +453,14 @@ wnd_cnt:
 ; Top and bottom borders x = 0,16,..,496; left and right borders
 ; y = 16,32,..,224 (corners already covered). 92 lines, dc.w x1,y1,x2,y2.
 fan:
+        ifeq    shallow
 _fx     set     0
         rept    32
         dc.w    cx,cy,_fx,0         ; to the top border
         dc.w    cx,cy,_fx,fan_bot   ; to the bottom border
 _fx     set     _fx+16
         endr
+        endc
 _fy     set     16
         rept    14
         dc.w    cx,cy,0,_fy         ; to the left border
