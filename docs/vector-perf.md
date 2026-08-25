@@ -142,6 +142,25 @@ boundary (one VBL more or less flips the beat count); the two averaged
 binary meters (avg idle spins + 2-beat-loops-of-64) are the reliable
 readout. The 2-beat counter IS the frame-rate meter for the 50 Hz push.
 
+## The shape parade (shapes/) -- plausible game assets
+
+The cube engine generalized to data-driven meshes plus an asset
+pipeline: `tools/genmesh.py` holds five hand-designed solids -- cube
+(8v/6f/12e), dart fighter (4v/4f/6e), hex tower (12v/8f/18e), space
+mine (6v/8f/12e), and a Starglider-style enemy fighter (7v/10f/15e) --
+and emits validated tables: closed 2-manifold, consistent outward
+winding (proved by the every-edge-twice-opposite check), auto-oriented
+by signed volume against the known-good cube, Euler = 2, within the
+engine limits (<=16 vertices/faces, projection-safe radius <=84).
+`shapes/shapes.asm` cycles them 8 s each with the same culled,
+double-buffered, beat-scaled machinery. All five confirmed rendering
+correctly as solids.
+
+**Next session starts here**: a decimal readout routine (tiny 3x5
+digit font + divu-by-10 split) to replace binary cell-counting on the
+meters -- then per-object cost profiling of the parade, then engine
+features (input, multiple objects, clipping).
+
 ## What this means for 3D (so far)
 
 A wireframe cube (12 edges × ~80 px ≈ 1000 px) now roughly fits one

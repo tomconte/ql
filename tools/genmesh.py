@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Mesh pipeline for the shapes/ slideshow: hand-designed low-poly
+solids -> validated, winding-consistent tables as a vasm include.
+
+Coordinate system matches the engine: x right, y DOWN (screen), z away.
+Faces are vertex loops wound consistently; per mesh this script:
+  - checks every undirected edge appears in exactly 2 faces, once per
+    direction (closed 2-manifold + consistent winding),
+  - auto-orients the whole mesh by signed volume, matched against the
+    cube whose winding is known-good in the engine (cull test cross>0),
+  - checks Euler characteristic, engine limits (<=16 vertices/faces),
+    and the projection-safety radius (<=80 for Z0=300, focal 256/170),
+  - derives the edge list with per-edge two-face masks (bit f = face f),
+  - emits faces LAST-FIRST so the cull loop's dbf counter is the bit
+    number, and a directory of counts + offsets from the meshes base.
+
+Emits shapes/meshes.inc on stdout. Used by shapes/Makefile."""
+
+import sys
+
+# name, vertices (x,y,z), faces as outward-wound vertex loops
+MESHES = [
+    ("cube",
+     [(-48,-48,-48),(48,-48,-48),(48,48,-48),(-48,48,-48),
+      (-48,-48,48),(48,-48,48),(48,48,48),(-48,48,48)],
+     [[0,1,2,3],[1,0,4,5],[2,1,5,6],[3,2,6,7],[0,3,7,4],[5,4,7,6]]),
+
+    ("dart",                            # triangular enemy ship
+     [(0,6,-70),(-52,6,42),(52,6,42),(0,-22,30)],
+     [[0,1,2],[0,2,3],[1,0,3],[2,1,3]]),
+
+    ("tower",                           # hexagonal tower
+     [(40,-55,0),(20,-55,35),(-20,-55,35),(-40,-55,0),(-20,-55,-35),(20,-55,-35),
+      (40,55,0),(20,55,35),(-20,55,35),(-40,55,0),(-20,55,-35),(20,55,-35)],
+     [[0,1,2,3,4,5],                    # top cap
+      [11,10,9,8,7,6],                  # bottom cap
+      [1,0,6,7],[2,1,7,8],[3,2,8,9],[4,3,9,10],[5,4,10,11],[0,5,11,6]]),
+
+    ("mine",                            # stretched octahedron
+     [(0,0,-70),(0,0,70),(-42,0,0),(42,0,0),(0,-42,0),(0,42,0)],
+     [[0,2,4],[0,4,3],[0,3,5],[0,5,2],
+      [1,4,2],[1,3,4],[1,5,3],[1,2,5]]),
+
+    ("fighter",                         # the Starglider-style bandit:
+     [(0,0,-78),                        # 0 nose
+      (0,-16,-18),                      # 1 cockpit hump
+      (0,-10,52),                       # 2 tail top
+      (0,12,52),                        # 3 tail bottom
+      (0,16,-8),                        # 4 belly
+      (-64,8,40),                       # 5 left wingtip
+      (64,8,40)],                       # 6 right wingtip
+     [[0,1,5],[1,2,5],[2,3,5],[3,4,5],[4,0,5],       # left skin
+      [1,0,6],[2,1,6],[3,2,6],[4,3,6],[0,4,6]]),     # right skin
+]
+
+SHOW_RADIUS = 84        # projection-safe bound (Z0=300, focal 256/170):
+                        # the cube's 83 is proven on screen (x 256+-98,
+                        # y 120+-66, clear of the meter rows at 240)
+
+def cross(a, b):
+    return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+
+def sub(a, b):
+    return (a[0]-b[0], a[1]-b[1], a[2]-b[2])
+
+def dot(a, b):
+    return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]
+
+def signed_volume(verts, faces):
+    vol = 0
+    for f in faces:
+        for i in range(1, len(f)-1):
+            a, b, c = verts[f[0]], verts[f[i]], verts[f[i+1]]
+            vol += dot(a, cross(b, c))
+    return vol
+
+def validate(name, verts, faces):
+    if len(verts) > 16 or len(faces) > 16:
+        sys.exit(f"{name}: >16 vertices or faces")
+    r2max = max(dot(v, v) for v in verts)
+    if r2max > SHOW_RADIUS * SHOW_RADIUS:
+        sys.exit(f"{name}: radius {r2max**0.5:.0f} > {SHOW_RADIUS}")
+    edges = {}
+    for fi, f in enumerate(faces):
+        for k in range(len(f)):
+            a, b = f[k], f[(k+1) % len(f)]
+            key, direc = (min(a, b), max(a, b)), a < b
+            edges.setdefault(key, []).append((fi, direc))
+    for (a, b), uses in edges.items():
+        if len(uses) != 2 or uses[0][1] == uses[1][1]:
+            sys.exit(f"{name}: edge {a}-{b} not manifold/consistent: {uses}")
+    ne = len(edges)
+    euler = len(verts) - ne + len(faces)
+    if euler != 2:
+        sys.exit(f"{name}: Euler {euler} != 2, not a closed solid")
+    return edges, r2max ** 0.5
+
+ref_sign = None
+out_meshes = []
+for name, verts, faces in MESHES:
+    vol = signed_volume(verts, faces)
+    if ref_sign is None:                # the cube anchors orientation
+        ref_sign = 1 if vol > 0 else -1
+    if vol * ref_sign < 0:
+        faces = [list(reversed(f)) for f in faces]
+        vol = -vol
+    edges, radius = validate(name, verts, faces)
+    edge_list = []
+    for (a, b), uses in sorted(edges.items()):
+        mask = (1 << uses[0][0]) | (1 << uses[1][0])
+        edge_list.append((a, b, mask))
+    out_meshes.append((name, verts, faces, edge_list))
+    print(f"; {name}: V{len(verts)} E{len(edge_list)} F{len(faces)} "
+          f"Euler 2, radius {radius:.0f}, winding consistent",
+          file=sys.stderr)
+
+print("; generated by tools/genmesh.py -- do not edit")
+print("meshes:")
+for name, verts, faces, edge_list in out_meshes:
+    print(f"; ----- {name}: V{len(verts)} F{len(faces)} E{len(edge_list)}")
+    print(f"m_{name}_v:")
+    for x, y, z in verts:
+        print(f"        dc.w    {x},{y},{z}")
+    print(f"m_{name}_f:")                  # last face first: dbf = bit no.
+    for f in reversed(faces):
+        a, b, c = f[0]*4, f[1]*4, f[2]*4
+        print(f"        dc.b    {a},{b},{c}")
+    print("        even")
+    print(f"m_{name}_e:")                  # i*4, j*4, two-face mask word
+    for a, b, mask in edge_list:
+        print(f"        dc.b    {a*4},{b*4}")
+        print(f"        dc.w    ${mask:04x}")
+print("; directory: nvtx-1, nfaces-1, nedges-1, v/f/e offsets from meshes")
+print(f"nobjs       equ     {len(out_meshes)}")
+print("objdir:")
+for name, verts, faces, edge_list in out_meshes:
+    print(f"        dc.w    {len(verts)-1},{len(faces)-1},{len(edge_list)-1}")
+    print(f"        dc.w    m_{name}_v-meshes,m_{name}_f-meshes,"
+          f"m_{name}_e-meshes")

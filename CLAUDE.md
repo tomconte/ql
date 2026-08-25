@@ -93,6 +93,12 @@ format spec in `docs/mdv-format.md`.
   `sound_test/ipc_sound.asm`. Double-buffered programs: `flip/` (mode 4)
   and `flip8/` (mode 8) are the reference implementations — new work
   copies whichever mode matches.
+- 3D/vector work: `lib/draw_line_w.asm` is the optimized white line
+  drawer (register API, slope-classed fast path); meshes are defined
+  and validated in `tools/genmesh.py` (winding-consistent closed
+  solids -> `.inc` tables), sin tables come from `tools/gensin.py`;
+  `shapes/` is the reference 3D engine (cull, erase, meters).
+  Measurements and method: `docs/vector-perf.md`.
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the

@@ -1,0 +1,3 @@
+100 PRINT "Shape parade: cube, dart, tower, mine, fighter -- 8 s each."
+110 PRINT "Meters: avg idle spins (top), 2-beat loops of 128 (below)."
+120 EXEC mdv1_shapes_bin
