@@ -94,6 +94,30 @@ So `draw_line` dispatches x-major lines with |dx| ≥ 2|dy| to `xfast`:
   horizontals approach ~28 nominal/px. Dispatch threshold 2:1 is right at
   the break-even the estimate predicted.
 
+## Reality check: the cube (cube/, first 3D milestone)
+
+Rotating wireframe cube, 12 white edges (~700 px projected), perspective,
+double-buffered with bounding-box erase. Measured with the averaged
+meters (64-loop window; 1 idle spin ~ 20 us):
+
+- **Locked 25 Hz**: 64/64 loops take 2 beats.
+- Average work **22.4 ms**/loop (878 avg idle spins = 17.6 ms slack in
+  the 40 ms beat); worst orientations ~27 ms, best ~21 ms (live bar
+  range) -- orientation swings edge foreshortening and bbox area.
+- Estimated split at the average: draw ~12 ms, bbox erase ~9 ms,
+  transform+project ~2.5 ms.
+
+**Road to 50 Hz**: worst case must drop below 20 ms, a ~26% cut. Ranked
+levers: movem-based erase (~2x on the clear, saves ~4 ms) > steep-line
+fast path (~1.5 ms) > per-line setup slimming (~1 ms) > mid-slope
+unroll (~1 ms). Together they reach ~19 ms worst case -- tight; csize
+is the escape hatch.
+
+Instrumentation note: the live headroom bar teleports near the 20 ms
+boundary (one VBL more or less flips the beat count); the two averaged
+binary meters (avg idle spins + 2-beat-loops-of-64) are the reliable
+readout. The 2-beat counter IS the frame-rate meter for the 50 Hz push.
+
 ## What this means for 3D (so far)
 
 A wireframe cube (12 edges × ~80 px ≈ 1000 px) now roughly fits one

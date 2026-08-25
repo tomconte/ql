@@ -18,9 +18,10 @@
 ;      wide as tall on a 4:3 screen -- the cube LOOKS cubic
 ;   4. draw the 12 edges with lib/draw_line_w.asm (white, shallow lines
 ;      through the byte-granular fast path)
-;   5. headroom bar (game8's honest gauge): green bar at the bottom =
-;      idle spins in the VBL wait; toward zero = over budget. At 25 Hz
-;      the bar shows the slack of the second frame.
+;   5. instrumentation: the live headroom bar (game8's gauge: idle
+;      spins in the VBL wait) plus two 64-loop-averaged binary meters
+;      (the lines/ readout) -- avg idle spins, and 2-beat loops out of
+;      64 (0 = solid 50 Hz, 64 = solid 25 Hz). See draw_meters.
 ;
 ; No clipping: S/Z0/focal are chosen so the projection stays on screen
 ; (max extent x 256+-98, y 120+-66) clear of the bar rows.
@@ -235,24 +236,71 @@ frame_loop:
         bsr     draw_line_w
         dbf     d6,.edge
 
-; ----- headroom bar, then VBL sync + flip. Ack FIRST: at 25 Hz that
-; consumes the VBL that fired mid-drawing, and the wait locks the flip
-; to the next real edge -- flips stay VBL-aligned however long drawing
-; took. The bar therefore measures the slack of the frame pair.
+; ----- headroom bar + meters, then VBL sync + flip. A pending frame
+; bit at end-of-work means the work crossed a VBL: this loop takes two
+; beats (25 Hz). Consume it, then wait for the next real edge so flips
+; stay VBL-aligned however long drawing took. The live bar shows this
+; loop's idle spins; the meters average 64 loops (see draw_meters).
         bsr     draw_hbar
-        move.b  #1<<pc__frame,pc_intr   ; consume any pending edge
-        moveq   #0,d0
+        bsr     draw_meters
+        moveq   #0,d1               ; d1 = 1 if this was a 2-beat loop
+        btst    #pc__frame,pc_intr
+        beq.s   .onb
+        moveq   #1,d1
+        move.b  #1<<pc__frame,pc_intr   ; consume the mid-work edge
+.onb:   moveq   #0,d0
 .wait:  addq.l  #1,d0               ; count idle spins = headroom
         btst    #pc__frame,pc_intr
         beq.s   .wait
+        move.b  #1<<pc__frame,pc_intr   ; consume the terminal edge, so
+                                    ; next loop's pending-test is honest
         lea     headroom(pc),a2
         move.l  d0,(a2)
+        add.l   d0,4(a2)            ; window accumulators: spins,
+        add.w   d1,8(a2)            ; 2-beat loops,
+        subq.w  #1,10(a2)           ; loops left in the window
+        bne.s   .flip
+        move.w  #64,10(a2)
+        move.l  4(a2),d0            ; latch: avg spins/loop,
+        lsr.l   #6,d0
+        move.w  d0,12(a2)
+        move.w  8(a2),14(a2)        ; 2-beat count of the 64
+        clr.l   4(a2)
+        clr.w   8(a2)
+.flip:
 
         move.w  d7,d0               ; flip: display the buffer just drawn
         ror.b   #1,d0               ; 0 -> $00, 1 -> $80
         move.b  d0,mc_stat
         eori.w  #1,d7               ; other buffer becomes the back one
         bra     frame_loop
+
+; ------------------------------------------------------------------- meters
+; Two 16-bit binary readouts (the lines/ instrument: MSB left, 8-px
+; cell per bit, dashed ruler under each), averaged over 64 loops so
+; they hold steady -- the live bar is honest but teleports near the
+; 20 ms boundary, where one VBL more or less flips the beat count:
+;   rows 240-242: average idle spins per loop (1 spin ~ 20 us)
+;   rows 245-247: 2-beat loops out of 64 (0 = pure 50 Hz, 64 = 25 Hz)
+draw_meters:
+        lea     headroom+12(pc),a1
+        move.w  (a1)+,d0
+        lea     240*scr_llen+48(a4),a0
+        bsr.s   draw_ro
+        move.w  (a1),d0
+        lea     245*scr_llen+48(a4),a0
+draw_ro:                            ; (fallthrough: 2nd readout's rts
+        moveq   #16-1,d2            ;  returns to draw_meters' caller)
+.cell:  moveq   #0,d1
+        add.w   d0,d0               ; MSB out into carry
+        bcc.s   .un
+        move.b  #$fc,d1             ; lit: 6 px block + 2 px gap
+.un:    move.b  d1,(a0)             ; green byte, 2 value rows
+        move.b  d1,scr_llen(a0)
+        move.b  #$fc,2*scr_llen(a0) ; ruler row
+        addq.l  #2,a0
+        dbf     d2,.cell
+        rts
 
 ; -------------------------------------------------------------- headroom bar
 ; game8's gauge in mode 4: 64 groups of 8 px, lit = green byte $ff.
@@ -289,7 +337,12 @@ draw_hbar:
 angles: dc.w    0,0                 ; yaw, pitch (brads 0..255)
 trig:   dc.w    0,0,0,0             ; sa, ca, sb, cb (8.8, set per frame)
 headroom:
-        dc.l    0                   ; idle spins in last frame's VBL wait
+        dc.l    0                   ; idle spins in last loop's VBL wait
+        dc.l    0                   ; +4  window: spins accumulator
+        dc.w    0                   ; +8  window: 2-beat loop count
+        dc.w    64                  ; +10 loops left in the window
+        dc.w    0                   ; +12 latched avg spins (meter A)
+        dc.w    0                   ; +14 latched 2-beat count (meter B)
 
 ; per-buffer erase boxes: miny, nrows, byte offset, long-pair count-1
 bbox0:  dc.w    0,0,0,0             ; nrows = 0: nothing to erase yet
