@@ -1,0 +1,2 @@
+100 PRINT "Rotating wireframe cube, 25 Hz. Bottom bar = frame headroom."
+110 EXEC mdv1_cube_bin
