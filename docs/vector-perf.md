@@ -31,9 +31,11 @@ border lines lands in the window) shifted between windows.
 
 Budget: 7.5 MHz / 50 Hz = **150 000 CPU cycles per 20 ms frame**.
 
-Tables: **fan** = the 92-line all-octant fan (avg 187 px);
-**shallow** = its 28 left/right-border lines only (avg 256 px, slopes
-1:2.5 to 1:32 -- the fast path's class, `shallow equ 1`).
+Tables (`table equ 0/1/2`): **fan** = the 92-line all-octant fan (avg
+187 px); **shallow** = its 28 left/right-border lines only (avg 256 px,
+slopes 1:2.5 to 1:32 -- the fast path's class); **short** = the fan with
+every line chopped into 4 chained segments (368 lines, avg 47 px --
+same pixels and slopes, 4x the setups).
 
 | Variant | table | lines/f | px/frame | eff. cyc/px | notes |
 |---|---|---|---|---|---|
@@ -41,6 +43,7 @@ Tables: **fan** = the 92-line all-octant fan (avg 187 px);
 | Baseline Bresenham | shallow | 3.4 | 879 | 171 | baseline is slope-uniform (control run) |
 | + xfast dispatch | fan | 5.8 | 1078 | 139 | **1.26x** -- gain diluted by the fan's slope mix |
 | + xfast dispatch | shallow | 6.5 | 1677 | 89 | **1.91x** on the class it targets |
+| + xfast dispatch | short | 19 | 931 | 161 | -13.6% vs fan: per-line overhead ~1100-1400 eff cycles |
 
 (Measured 2026-08-25; fan visually verified, and xfast is pixel-identical
 to the baseline by exhaustive simulation -- `use_fast equ 0/1` to A/B.)
@@ -106,9 +109,12 @@ expected value order:
 3. **White lines** — 2 planes double the partial-byte writes, but xfast
    full bytes become one `move.w $ffff` (both planes, 8 px, ~20 cycles):
    white shallow lines may cost *less* per pixel than green ones.
-4. **Short-line table** — real 3D edges are 40–80 px; setup amortization
-   (~600 eff. cycles/line: div-free but ~30 instructions) matters more
-   there.
+4. ~~Short-line table~~ — **measured** (row above): at 47 px the whole
+   per-line cost (draw_line entry + dispatch + xfast phase bookkeeping +
+   the bench loop itself) is ~1100–1400 eff. cycles ≈ 15% of the pixel
+   cost. A tax worth trimming someday (e.g. the 3D pipeline passing
+   pre-classified edges), not a priority: game-length edges keep ~86% of
+   the long-line throughput.
 5. Then the first **rotating wireframe** with double buffering (erase =
    redraw in black, halving the px budget) — and note for later: solid
    polygon fill is all horizontal runs, i.e. the regime where the byte

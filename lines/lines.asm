@@ -32,9 +32,10 @@
 ;             Steeper lines keep the baseline loops -- a y-step forces a
 ;             flush, and near-diagonal lines step every 1-2 pixels,
 ;             where flush cost would lose to the plain loop.
-;   shallow   restrict the table to the 28 left/right-border lines (the
-;             fast path's slope class) to measure the class in isolation
-;             -- the full fan's slope mix dilutes it.
+;   table     0 full fan / 1 shallow class only / 2 the fan chopped into
+;             4 segments per line -- table 1 isolates the fast path's
+;             class, table 2 isolates per-line setup overhead at
+;             realistic 3D edge lengths (avg 47 px).
 ;
 ; Assemble: vasmm68k_mot -m68008 -Fbin -o lines_bin lines.asm
 
@@ -60,8 +61,15 @@ ro_cell     equ     %11111100                   ; 6 px block + 2 px gap
 
 use_fast    equ     1               ; 1 = dispatch shallow x-major lines
                                     ; to the byte-granular fast path
-shallow     equ     0               ; 1 = table holds only the shallow
-                                    ; left/right-border lines
+table       equ     0               ; 0 = the full 92-line fan
+                                    ; 1 = shallow only: the 28 left/right
+                                    ;     border lines (xfast's class)
+                                    ; 2 = short lines: the same fan with
+                                    ;     every line chopped into 4
+                                    ;     segments (avg 47 px) -- same
+                                    ;     pixels and slopes, 4x the line
+                                    ;     setups: isolates the per-line
+                                    ;     overhead at real-3D-edge length
 
 avg_frames  equ     256             ; readout averaging window (power of 2).
 avg_shift   equ     8               ; 256 frames ~ 5 s per update: a window
@@ -452,19 +460,38 @@ wnd_cnt:
 ; fan table, generated at assembly time: centre -> border points.
 ; Top and bottom borders x = 0,16,..,496; left and right borders
 ; y = 16,32,..,224 (corners already covered). 92 lines, dc.w x1,y1,x2,y2.
+; fanline emits one whole line -- or, for the short-line table, the same
+; line as 4 chained segments (joints redrawn, +3 px per line: counted
+; honestly, that duplication is part of segmented drawing's cost).
+fanline macro                       ; \1,\2 = border endpoint
+        ifne    table-2
+        dc.w    cx,cy,\1,\2
+        endc
+        ifeq    table-2
+        dc.w    cx,cy
+        dc.w    cx+((\1-cx)/4),cy+((\2-cy)/4)
+        dc.w    cx+((\1-cx)/4),cy+((\2-cy)/4)
+        dc.w    cx+((\1-cx)/2),cy+((\2-cy)/2)
+        dc.w    cx+((\1-cx)/2),cy+((\2-cy)/2)
+        dc.w    cx+(((\1-cx)*3)/4),cy+(((\2-cy)*3)/4)
+        dc.w    cx+(((\1-cx)*3)/4),cy+(((\2-cy)*3)/4)
+        dc.w    \1,\2
+        endc
+        endm
+
 fan:
-        ifeq    shallow
+        ifne    table-1
 _fx     set     0
         rept    32
-        dc.w    cx,cy,_fx,0         ; to the top border
-        dc.w    cx,cy,_fx,fan_bot   ; to the bottom border
+        fanline _fx,0               ; to the top border
+        fanline _fx,fan_bot         ; to the bottom border
 _fx     set     _fx+16
         endr
         endc
 _fy     set     16
         rept    14
-        dc.w    cx,cy,0,_fy         ; to the left border
-        dc.w    cx,cy,511,_fy       ; to the right border
+        fanline 0,_fy               ; to the left border
+        fanline 511,_fy             ; to the right border
 _fy     set     _fy+16
         endr
 fan_end:
