@@ -113,6 +113,15 @@ fast path (~1.5 ms) > per-line setup slimming (~1 ms) > mid-slope
 unroll (~1 ms). Together they reach ~19 ms worst case -- tight; csize
 is the escape hatch.
 
+**Backface culling** (the Elite/Starglider tier of "hidden lines" --
+2D winding test after projection, 2 muls/face; exact for a convex
+solid): measured 40/64 loops at 2 beats + 680 avg idle spins = average
+work **18.9 ms** (~31 fps effective, mixed 50/25). The engine feature
+bought the predicted ~25% of the draw (~3.5 ms) before any hand
+optimization -- and makes the cube read as solid. With mixed beats the
+top meter goes bimodal; the 2-beat counter is the reliable gauge, and
+rotation must advance by elapsed beats to keep constant speed.
+
 Instrumentation note: the live headroom bar teleports near the 20 ms
 boundary (one VBL more or less flips the beat count); the two averaged
 binary meters (avg idle spins + 2-beat-loops-of-64) are the reliable

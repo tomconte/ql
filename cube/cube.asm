@@ -16,8 +16,16 @@
 ;   3. project: perspective, px = 256 + x'*256/(Z0+z), and the y focal
 ;      length scaled to 170 (~2/3) because mode 4 pixels are ~2/3 as
 ;      wide as tall on a 4:3 screen -- the cube LOOKS cubic
-;   4. draw the 12 edges with lib/draw_line_w.asm (white, shallow lines
-;      through the byte-granular fast path)
+;   4. backface culling, Elite/Starglider style: every face is wound
+;      consistently as seen from outside, so face f is front-facing iff
+;      its PROJECTED winding keeps its sign -- one 2D cross product per
+;      face, no normals. Each edge carries a mask of its two faces and
+;      is drawn only if at least one is visible: for a convex solid
+;      that IS exact hidden-line removal (~9 of 12 edges drawn).
+;   4b. draw the visible edges with lib/draw_line_w.asm (white, shallow
+;      lines through the byte-granular fast path). Rotation advances by
+;      the previous loop's BEAT count, so the spin speed stays constant
+;      in time even when the frame rate mixes 50 and 25 Hz.
 ;   5. instrumentation: the live headroom bar (game8's gauge: idle
 ;      spins in the VBL wait) plus two 64-loop-averaged binary meters
 ;      (the lines/ readout) -- avg idle spins, and 2-beat loops out of
@@ -45,8 +53,11 @@ yfocal      equ     170             ; py = 120 + y'*yfocal/(Z0+z)
 ctr_x       equ     256
 ctr_y       equ     120
 
-da          equ     2               ; yaw brads/frame   (256 = full turn)
-db          equ     3               ; pitch brads/frame
+; angles are 8.8 fixed-point brads (65536 units = a full turn, so word
+; wrap-around IS the modulo); steps are per BEAT (20 ms), scaled by the
+; previous loop's beat count -- constant speed in time at any frame rate
+da          equ     256             ; yaw: 1 brad/beat (2.5 turns/min)
+db          equ     384             ; pitch: 1.5 brads/beat
 
 ; headroom bar (game8 calibration: ~1000 idle spins = a whole free frame)
 hb_y        equ     252             ; bar top line (2 rows tall)
@@ -87,40 +98,79 @@ frame_loop:
         beq.s   .bb0
         lea     scr1,a4
 .bb0:
-; ----- erase the cube this buffer held two frames ago: clear its
-; bounding box rows in 32-px-aligned long pairs (bbox: miny, nrows,
-; byte offset, long-pair count-1; nrows = 0 -> nothing yet)
+; ----- erase the cube this buffer held two frames ago: movem-clear its
+; bounding box rows (bbox: miny, nrows, end-of-span offset, 36-byte
+; chunk count-1; nrows = 0 -> nothing yet). Nothing is live at the top
+; of the frame, so nine registers hold zeros with no saving; each
+; predecrementing movem clears 36 bytes. Spans round UP to chunks and
+; may spill into the next row's left edge -- harmless, everything in
+; the cube's rows outside the box is already black.
         lea     bbox0(pc),a2
         move.w  d7,d0
         lsl.w   #3,d0
         adda.w  d0,a2               ; a2 = bbox[d7]
         move.w  (a2)+,d1            ; miny
         move.w  (a2)+,d2            ; nrows
-        beq.s   .noer
-        move.w  (a2)+,d3            ; byte offset in the row
-        move.w  (a2)+,d4            ; long pairs - 1
+        beq     .noer
+        move.w  (a2)+,d3            ; end-of-span offset in the row
+        move.w  (a2),d4             ; chunk count - 1 (0..3)
         lsl.w   #7,d1
         add.w   d3,d1
-        lea     (a4,d1.w),a0
-        moveq   #0,d0
-.erow:  move.l  a0,a1
-        move.w  d4,d5
-.epl:   move.l  d0,(a1)+            ; 16 px, both planes
-        move.l  d0,(a1)+
-        dbf     d5,.epl
-        lea     scr_llen(a0),a0
+        lea     (a4,d1.w),a0        ; end of the first row's span
+        moveq   #0,d0               ; nine zeros for the bursts
+        moveq   #0,d1
+        moveq   #0,d3
+        moveq   #0,d5
+        moveq   #0,d6
+        suba.l  a1,a1
+        suba.l  a2,a2
+        suba.l  a3,a3
+        suba.l  a5,a5
+        tst.w   d4                  ; pick the row loop for the width
+        beq.s   .c1
+        subq.w  #1,d4
+        beq.s   .c2
+        subq.w  #1,d4
+        beq.s   .c3
+.c4:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        lea     scr_llen+144(a0),a0
         subq.w  #1,d2
-        bne.s   .erow
+        bne.s   .c4
+        bra.s   .noer
+.c3:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        lea     scr_llen+108(a0),a0
+        subq.w  #1,d2
+        bne.s   .c3
+        bra.s   .noer
+.c2:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        lea     scr_llen+72(a0),a0
+        subq.w  #1,d2
+        bne.s   .c2
+        bra.s   .noer
+.c1:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        lea     scr_llen+36(a0),a0
+        subq.w  #1,d2
+        bne.s   .c1
 .noer:
 
-; ----- rotate: advance angles, look up sin/cos into trig(pc)
+; ----- rotate: advance angles by the previous loop's beats (constant
+; angular speed in TIME), look up sin/cos into trig(pc)
         lea     angles(pc),a0
         lea     sintab(pc),a1
         lea     trig(pc),a2
-        move.w  (a0),d0             ; yaw
-        addq.w  #da,d0
-        and.w   #255,d0
+        move.w  headroom+16(pc),d2  ; beats of the previous loop (1|2)
+        move.w  d2,d1
+        muls.w  #da,d1              ; yaw step
+        move.w  (a0),d0
+        add.w   d1,d0               ; word wrap = mod 256 brads
         move.w  d0,(a0)
+        lsr.w   #8,d0               ; integer brad
         add.w   d0,d0
         move.w  (a1,d0.w),d1
         move.w  d1,(a2)             ; sa
@@ -130,10 +180,12 @@ frame_loop:
         add.w   d0,d0
         move.w  (a1,d0.w),d1
         move.w  d1,2(a2)            ; ca
-        move.w  2(a0),d0            ; pitch
-        addq.w  #db,d0
-        and.w   #255,d0
+        move.w  d2,d1
+        muls.w  #db,d1              ; pitch step
+        move.w  2(a0),d0
+        add.w   d1,d0
         move.w  d0,2(a0)
+        lsr.w   #8,d0
         add.w   d0,d0
         move.w  (a1,d0.w),d1
         move.w  d1,4(a2)            ; sb
@@ -214,26 +266,74 @@ frame_loop:
         sub.w   d2,d3
         addq.w  #1,d3
         move.w  d3,(a2)+            ; nrows
-        lsr.w   #5,d0               ; 32-px units
+        lsr.w   #5,d0               ; 32-px (8-byte) units
         lsr.w   #5,d1
-        sub.w   d0,d1               ; long pairs - 1
-        lsl.w   #3,d0               ; byte offset = unit * 8
-        move.w  d0,(a2)+
-        move.w  d1,(a2)
+        sub.w   d0,d1               ; units spanned - 1 (0..15)
+        lsl.w   #3,d0               ; start byte offset
+        moveq   #0,d4               ; chunks needed for (units+1)*8
+        add.w   #36,d0              ; bytes: end offset grows a chunk
+        cmp.w   #3,d1               ; at a time. <= 32 bytes: 1 chunk
+        ble.s   .cok
+        addq.w  #1,d4
+        add.w   #36,d0
+        cmp.w   #8,d1               ; <= 72 bytes: 2
+        ble.s   .cok
+        addq.w  #1,d4
+        add.w   #36,d0
+        cmp.w   #12,d1              ; <= 104 bytes: 3
+        ble.s   .cok
+        addq.w  #1,d4
+        add.w   #36,d0              ; 4 chunks = 144, covers max 128
+.cok:   move.w  d0,(a2)+            ; end-of-span offset
+        move.w  d4,(a2)             ; chunk count - 1
 
-; ----- draw the 12 edges
+; ----- backface culling: build the face-visibility mask in d5.
+; Screen coords have y growing DOWN, and the face tables are wound so a
+; front-facing face projects with cross > 0:
+;   cross = (bx-ax)*(cy-ay) - (by-ay)*(cx-ax)   (long: terms reach ~40000)
+; The faces table is ordered F5 first so the dbf counter is the bit no.
+        lea     faces(pc),a0
+        lea     vtx2d(pc),a3        ; a3 stays vtx2d through the draws
+        moveq   #0,d5
+        moveq   #6-1,d6
+.face:  moveq   #0,d0
+        move.b  (a0)+,d0            ; vertex a (offsets pre-multiplied)
+        moveq   #0,d1
+        move.b  (a0)+,d1            ; vertex b
+        moveq   #0,d2
+        move.b  (a0)+,d2            ; vertex c
+        move.w  (a3,d1.w),d3        ; bx - ax
+        sub.w   (a3,d0.w),d3
+        move.w  2(a3,d2.w),d4       ; cy - ay
+        sub.w   2(a3,d0.w),d4
+        muls.w  d4,d3
+        move.w  2(a3,d1.w),d4       ; by - ay
+        sub.w   2(a3,d0.w),d4
+        move.w  (a3,d2.w),d1        ; cx - ax
+        sub.w   (a3,d0.w),d1
+        muls.w  d1,d4
+        sub.l   d4,d3               ; cross
+        ble.s   .hid                ; <= 0: backface (or edge-on)
+        bset    d6,d5
+.hid:   dbf     d6,.face
+        move.w  d5,a5               ; park the mask across the draws
+
+; ----- draw the edges whose faces are not all hidden
         lea     edges(pc),a2
         moveq   #12-1,d6
-.edge:  moveq   #0,d2
-        move.b  (a2)+,d0            ; vertex offsets (pre-multiplied by 4)
-        move.b  (a2)+,d2
+.edge:  move.w  a5,d0
+        and.b   2(a2),d0            ; edge's two-face mask vs visibility
+        beq.s   .skip
+        moveq   #0,d2
+        move.b  (a2),d0             ; vertex offsets (pre-multiplied)
+        move.b  1(a2),d2
         and.w   #$ff,d0
-        lea     vtx2d(pc),a1
-        move.w  2(a1,d0.w),d1       ; y1
-        move.w  (a1,d0.w),d0        ; x1
-        move.w  2(a1,d2.w),d3       ; y2
-        move.w  (a1,d2.w),d2        ; x2
+        move.w  2(a3,d0.w),d1       ; y1
+        move.w  (a3,d0.w),d0        ; x1
+        move.w  2(a3,d2.w),d3       ; y2
+        move.w  (a3,d2.w),d2        ; x2
         bsr     draw_line_w
+.skip:  addq.l  #3,a2
         dbf     d6,.edge
 
 ; ----- headroom bar + meters, then VBL sync + flip. A pending frame
@@ -258,6 +358,8 @@ frame_loop:
         move.l  d0,(a2)
         add.l   d0,4(a2)            ; window accumulators: spins,
         add.w   d1,8(a2)            ; 2-beat loops,
+        addq.w  #1,d1
+        move.w  d1,16(a2)           ; beats for the rotation step
         subq.w  #1,10(a2)           ; loops left in the window
         bne.s   .flip
         move.w  #64,10(a2)
@@ -343,6 +445,7 @@ headroom:
         dc.w    64                  ; +10 loops left in the window
         dc.w    0                   ; +12 latched avg spins (meter A)
         dc.w    0                   ; +14 latched 2-beat count (meter B)
+        dc.w    1                   ; +16 beats of the last loop (1|2)
 
 ; per-buffer erase boxes: miny, nrows, byte offset, long-pair count-1
 bbox0:  dc.w    0,0,0,0             ; nrows = 0: nothing to erase yet
@@ -358,10 +461,32 @@ verts:                              ; the 8 corners, x,y,z words
         dc.w     csize, csize, csize
         dc.w    -csize, csize, csize
 
-edges:                              ; 12 edges, vertex offsets (index*4)
-        dc.b    0*4,1*4, 1*4,2*4, 2*4,3*4, 3*4,0*4    ; back face
-        dc.b    4*4,5*4, 5*4,6*4, 6*4,7*4, 7*4,4*4    ; front face
-        dc.b    0*4,4*4, 1*4,5*4, 2*4,6*4, 3*4,7*4    ; connecting
+; faces: 3 test vertices each (offsets = index*4), wound so that viewed
+; from OUTSIDE the winding is consistent -- shared edges traversed in
+; opposite directions. Ordered F5-first: the cull loop's dbf counter is
+; the face's bit number.
+faces:
+        dc.b    5*4,4*4,7*4         ; F5 far (z=+s)      -> bit 5
+        dc.b    0*4,3*4,7*4         ; F4 left (x=-s)     -> bit 4
+        dc.b    3*4,2*4,6*4         ; F3 bottom (y=+s)   -> bit 3
+        dc.b    2*4,1*4,5*4         ; F2 right (x=+s)    -> bit 2
+        dc.b    1*4,0*4,4*4         ; F1 top (y=-s)      -> bit 1
+        dc.b    0*4,1*4,2*4         ; F0 near (z=-s)     -> bit 0
+
+; edges: two vertex offsets + the mask of the two faces meeting there
+edges:
+        dc.b    0*4,1*4,%00000011   ; F0+F1
+        dc.b    1*4,2*4,%00000101   ; F0+F2
+        dc.b    2*4,3*4,%00001001   ; F0+F3
+        dc.b    3*4,0*4,%00010001   ; F0+F4
+        dc.b    4*4,5*4,%00100010   ; F5+F1
+        dc.b    5*4,6*4,%00100100   ; F5+F2
+        dc.b    6*4,7*4,%00101000   ; F5+F3
+        dc.b    7*4,4*4,%00110000   ; F5+F4
+        dc.b    0*4,4*4,%00010010   ; F1+F4
+        dc.b    1*4,5*4,%00000110   ; F1+F2
+        dc.b    2*4,6*4,%00001100   ; F2+F3
+        dc.b    3*4,7*4,%00011000   ; F3+F4
         even
 
 vtx2d:  ds.w    16                  ; projected x,y per vertex
