@@ -1,0 +1,3 @@
+100 PRINT "Line benchmark: fan = correctness, bottom counters = perf."
+110 PRINT "Binary, MSB left: pixels/frame (top), lines/frame (below)."
+120 EXEC mdv1_lines_bin

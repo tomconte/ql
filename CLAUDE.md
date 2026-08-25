@@ -108,5 +108,7 @@ format spec in `docs/mdv-format.md`.
   interrupt masking, VBL polling, mode 4/8 screen memory layouts.
 - `docs/mdv-format.md` — QLay `.mdv` container + QDOS Microdrive
   filesystem: sector/checksum layout, map, directory, sources.
+- `docs/vector-perf.md` — line-drawing benchmark results (`lines/` rig),
+  cycle analysis, optimization roadmap toward wireframe 3D.
 - Background/scene notes live in the Obsidian vault:
   `C:\Users\tomco\OneDrive\Applications\remotely-save\Vault\Retro\QL\`
