@@ -120,7 +120,22 @@ work **18.9 ms** (~31 fps effective, mixed 50/25). The engine feature
 bought the predicted ~25% of the draw (~3.5 ms) before any hand
 optimization -- and makes the cube read as solid. With mixed beats the
 top meter goes bimodal; the 2-beat counter is the reliable gauge, and
-rotation must advance by elapsed beats to keep constant speed.
+rotation must advance by elapsed beats to keep constant speed (8.8
+fixed-point brads, stepped per beat).
+
+**Erase, measured then fixed.** A `no_erase` profiling flag (game8's
+pattern) isolated the true split: non-erase work 13.9 ms (0/128
+two-beat: the eraseless cube locks to 50 Hz), erase 4.6 ms. The first
+movem erase had saved only 0.4 ms: its 36-byte chunk granularity
+over-cleared the cube's 33-50 byte spans by up to 1.8x, eating exactly
+the per-byte win -- the cautionary tale about optimizing to an
+inferred cost. The fix sizes bursts exactly by patching the two movem
+register masks per frame (self-modifying, emtab): erase **2.8 ms**.
+
+Cube status: average work **16.7 ms**, 28/128 loops at 2 beats =
+**~41 fps effective**, worst orientations ~21-22 ms. The remaining
+50 Hz gap (~2 ms off the peak) lives in the draw (~11 ms): steep-line
+fast path > entry slimming > mid-slope unroll.
 
 Instrumentation note: the live headroom bar teleports near the 20 ms
 boundary (one VBL more or less flips the beat count); the two averaged

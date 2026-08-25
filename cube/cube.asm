@@ -63,6 +63,17 @@ db          equ     384             ; pitch: 1.5 brads/beat
 hb_y        equ     252             ; bar top line (2 rows tall)
 hb_shift    equ     4
 
+; profiling flags: skip a stage to measure its cost as the meter delta
+; (game8's no_sprites/no_music pattern). no_draw leaves the screen
+; empty, no_erase accumulates trails -- measurement builds, not demos.
+no_erase    equ     0
+no_draw     equ     0
+
+mwin        equ     128             ; meter window, loops (power of 2);
+mshift      equ     7               ; ~4 s per update, spans both
+                                    ; rotation periods, so readings
+                                    ; stop wandering with orientation
+
 ; ---------------------------------------------------------------- job header
 start:
         bra.s   main
@@ -99,12 +110,15 @@ frame_loop:
         lea     scr1,a4
 .bb0:
 ; ----- erase the cube this buffer held two frames ago: movem-clear its
-; bounding box rows (bbox: miny, nrows, end-of-span offset, 36-byte
-; chunk count-1; nrows = 0 -> nothing yet). Nothing is live at the top
-; of the frame, so nine registers hold zeros with no saving; each
-; predecrementing movem clears 36 bytes. Spans round UP to chunks and
-; may spill into the next row's left edge -- harmless, everything in
-; the cube's rows outside the box is already black.
+; bounding box rows (bbox: miny, nrows, end-of-span offset, L = longs
+; to clear per row; nrows = 0 -> nothing yet). Nothing is live at the
+; top of the frame, so nine registers hold zeros for free. The bursts
+; are sized EXACTLY: the register masks of the two movem instructions
+; below are patched per frame (self-modifying, the classic way) --
+; first burst min(L,9) registers, second the remainder from emtab (an
+; empty mask is a legal no-op). Measured before this: erase cost
+; 4.6 ms of the 18.5 ms frame, half of it chunk-rounding waste.
+        ifeq    no_erase
         lea     bbox0(pc),a2
         move.w  d7,d0
         lsl.w   #3,d0
@@ -113,10 +127,29 @@ frame_loop:
         move.w  (a2)+,d2            ; nrows
         beq     .noer
         move.w  (a2)+,d3            ; end-of-span offset in the row
-        move.w  (a2),d4             ; chunk count - 1 (0..3)
+        move.w  (a2),d4             ; L: longs to clear per row (2..16)
         lsl.w   #7,d1
         add.w   d3,d1
         lea     (a4,d1.w),a0        ; end of the first row's span
+        lea     emtab(pc),a1        ; patch the burst masks for L
+        moveq   #9,d1
+        moveq   #0,d3
+        cmp.w   d1,d4
+        ble.s   .esm
+        move.w  d4,d3
+        sub.w   d1,d3               ; L > 9: remainder mask L-9 regs
+        bra.s   .epq
+.esm:   move.w  d4,d1               ; L <= 9: first mask L regs only
+.epq:   add.w   d1,d1
+        move.w  (a1,d1.w),d1        ; first burst mask
+        add.w   d3,d3
+        move.w  (a1,d3.w),d3        ; second burst mask
+        lea     .em1+2(pc),a1
+        move.w  d1,(a1)
+        lea     .em2+2(pc),a1
+        move.w  d3,(a1)
+        lsl.w   #2,d4
+        add.w   #scr_llen,d4        ; row stride = 128 + 4L
         moveq   #0,d0               ; nine zeros for the bursts
         moveq   #0,d1
         moveq   #0,d3
@@ -126,38 +159,14 @@ frame_loop:
         suba.l  a2,a2
         suba.l  a3,a3
         suba.l  a5,a5
-        tst.w   d4                  ; pick the row loop for the width
-        beq.s   .c1
-        subq.w  #1,d4
-        beq.s   .c2
-        subq.w  #1,d4
-        beq.s   .c3
-.c4:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        lea     scr_llen+144(a0),a0
+.erow:
+.em1:   movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)   ; masks patched above
+.em2:   movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
+        adda.w  d4,a0
         subq.w  #1,d2
-        bne.s   .c4
-        bra.s   .noer
-.c3:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        lea     scr_llen+108(a0),a0
-        subq.w  #1,d2
-        bne.s   .c3
-        bra.s   .noer
-.c2:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        lea     scr_llen+72(a0),a0
-        subq.w  #1,d2
-        bne.s   .c2
-        bra.s   .noer
-.c1:    movem.l d0-d1/d3/d5-d6/a1-a3/a5,-(a0)
-        lea     scr_llen+36(a0),a0
-        subq.w  #1,d2
-        bne.s   .c1
+        bne.s   .erow
 .noer:
+        endc
 
 ; ----- rotate: advance angles by the previous loop's beats (constant
 ; angular speed in TIME), look up sin/cos into trig(pc)
@@ -268,30 +277,22 @@ frame_loop:
         move.w  d3,(a2)+            ; nrows
         lsr.w   #5,d0               ; 32-px (8-byte) units
         lsr.w   #5,d1
-        sub.w   d0,d1               ; units spanned - 1 (0..15)
-        lsl.w   #3,d0               ; start byte offset
-        moveq   #0,d4               ; chunks needed for (units+1)*8
-        add.w   #36,d0              ; bytes: end offset grows a chunk
-        cmp.w   #3,d1               ; at a time. <= 32 bytes: 1 chunk
-        ble.s   .cok
-        addq.w  #1,d4
-        add.w   #36,d0
-        cmp.w   #8,d1               ; <= 72 bytes: 2
-        ble.s   .cok
-        addq.w  #1,d4
-        add.w   #36,d0
-        cmp.w   #12,d1              ; <= 104 bytes: 3
-        ble.s   .cok
-        addq.w  #1,d4
-        add.w   #36,d0              ; 4 chunks = 144, covers max 128
-.cok:   move.w  d0,(a2)+            ; end-of-span offset
-        move.w  d4,(a2)             ; chunk count - 1
+        sub.w   d0,d1               ; units spanned - 1. The projection
+        lsl.w   #3,d0               ; bounds (x 159..353) cap this at 7,
+        add.w   d1,d1               ; so L = 2*units+2 <= 16 and the
+        addq.w  #2,d1               ; two 9-max bursts always cover it.
+        move.w  d1,d4
+        lsl.w   #2,d4               ; 4L = bytes cleared per row
+        add.w   d4,d0
+        move.w  d0,(a2)+            ; end-of-span offset
+        move.w  d1,(a2)             ; L, longs to clear per row
 
 ; ----- backface culling: build the face-visibility mask in d5.
 ; Screen coords have y growing DOWN, and the face tables are wound so a
 ; front-facing face projects with cross > 0:
 ;   cross = (bx-ax)*(cy-ay) - (by-ay)*(cx-ax)   (long: terms reach ~40000)
 ; The faces table is ordered F5 first so the dbf counter is the bit no.
+        ifeq    no_draw
         lea     faces(pc),a0
         lea     vtx2d(pc),a3        ; a3 stays vtx2d through the draws
         moveq   #0,d5
@@ -335,6 +336,7 @@ frame_loop:
         bsr     draw_line_w
 .skip:  addq.l  #3,a2
         dbf     d6,.edge
+        endc
 
 ; ----- headroom bar + meters, then VBL sync + flip. A pending frame
 ; bit at end-of-work means the work crossed a VBL: this loop takes two
@@ -362,9 +364,9 @@ frame_loop:
         move.w  d1,16(a2)           ; beats for the rotation step
         subq.w  #1,10(a2)           ; loops left in the window
         bne.s   .flip
-        move.w  #64,10(a2)
+        move.w  #mwin,10(a2)
         move.l  4(a2),d0            ; latch: avg spins/loop,
-        lsr.l   #6,d0
+        lsr.l   #mshift,d0
         move.w  d0,12(a2)
         move.w  8(a2),14(a2)        ; 2-beat count of the 64
         clr.l   4(a2)
@@ -383,7 +385,7 @@ frame_loop:
 ; they hold steady -- the live bar is honest but teleports near the
 ; 20 ms boundary, where one VBL more or less flips the beat count:
 ;   rows 240-242: average idle spins per loop (1 spin ~ 20 us)
-;   rows 245-247: 2-beat loops out of 64 (0 = pure 50 Hz, 64 = 25 Hz)
+;   rows 245-247: 2-beat loops out of mwin (0 = pure 50 Hz, all = 25)
 draw_meters:
         lea     headroom+12(pc),a1
         move.w  (a1)+,d0
@@ -442,14 +444,19 @@ headroom:
         dc.l    0                   ; idle spins in last loop's VBL wait
         dc.l    0                   ; +4  window: spins accumulator
         dc.w    0                   ; +8  window: 2-beat loop count
-        dc.w    64                  ; +10 loops left in the window
+        dc.w    mwin                ; +10 loops left in the window
         dc.w    0                   ; +12 latched avg spins (meter A)
         dc.w    0                   ; +14 latched 2-beat count (meter B)
         dc.w    1                   ; +16 beats of the last loop (1|2)
 
-; per-buffer erase boxes: miny, nrows, byte offset, long-pair count-1
+; per-buffer erase boxes: miny, nrows, end-of-span offset, longs/row
 bbox0:  dc.w    0,0,0,0             ; nrows = 0: nothing to erase yet
 bbox1:  dc.w    0,0,0,0
+
+; movem predecrement register masks for the first 0..9 registers of
+; the zeroed set d0,d1,d3,d5,d6,a1,a2,a3,a5 (predec mask: bit 15 = d0)
+emtab:  dc.w    $0000,$8000,$c000,$d000,$d400
+        dc.w    $d600,$d640,$d660,$d670,$d674
 
 verts:                              ; the 8 corners, x,y,z words
         dc.w    -csize,-csize,-csize
