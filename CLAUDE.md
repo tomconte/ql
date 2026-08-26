@@ -94,7 +94,9 @@ format spec in `docs/mdv-format.md`.
   and `flip8/` (mode 8) are the reference implementations — new work
   copies whichever mode matches.
 - 3D/vector work: `lib/draw_line_w.asm` is the optimized white line
-  drawer (register API, slope-classed fast path); meshes are defined
+  drawer (register API, slope-classed fast path);
+  `lib/draw_dec.asm` prints a word as a 6-digit decimal readout
+  (3x5 green digits, mode 4 — meters, future score displays); meshes are defined
   and validated in `tools/genmesh.py` (winding-consistent closed
   solids -> `.inc` tables), sin tables come from `tools/gensin.py`;
   `shapes/` is the reference 3D engine (cull, erase, meters).

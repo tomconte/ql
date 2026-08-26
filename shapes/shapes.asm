@@ -3,7 +3,7 @@
 ; The cube engine (cube/cube.asm) generalized to data-driven meshes: a
 ; demo-style slideshow cycling five validated solids -- cube, dart
 ; fighter, hexagonal tower, space mine, and a 10-face Starglider-style
-; enemy fighter -- 8 seconds each, tumbling under the same yaw+pitch.
+; enemy fighter -- 12 seconds each, tumbling under the same yaw+pitch.
 ;
 ; Meshes come from meshes.inc, generated and VALIDATED by
 ; tools/genmesh.py: closed 2-manifolds, consistent outward winding
@@ -16,8 +16,10 @@
 ; MODE 4 takeover, double buffer, exact-mask movem erase (self-
 ; modifying bursts), 8.8-brad beat-scaled rotation, backface culling,
 ; white edges via lib/draw_line_w.asm, live headroom bar + averaged
-; meters (top: avg idle spins, ~20 us each; bottom: 2-beat loops out
-; of 128). The meters now profile each OBJECT as it shows.
+; decimal meters via lib/draw_dec.asm (top: avg idle spins, ~20 us
+; each; bottom: 2-beat loops out of 128), profiling each OBJECT as
+; it shows: the window restarts at every switch and the meters stay
+; blank until its first latch, so a visible number is pure.
 ;
 ; Assemble: vasmm68k_mot -m68008 -Fbin -o shapes_bin shapes.asm
 
@@ -41,7 +43,7 @@ ctr_y       equ     120
 da          equ     256             ; yaw: 1 brad/beat
 db          equ     384             ; pitch: 1.5 brads/beat
 
-showtime    equ     400             ; beats per object (8 s)
+showtime    equ     600             ; beats per object (12 s)
 
 ; headroom bar (game8 calibration: ~1000 idle spins = a whole free frame)
 hb_y        equ     252             ; bar top line (2 rows tall)
@@ -348,6 +350,7 @@ frame_loop:
         lsr.l   #mshift,d0
         move.w  d0,12(a2)
         move.w  8(a2),14(a2)        ; 2-beat count of the window
+        move.w  #1,18(a2)           ; first pure latch: unblank meters
         clr.l   4(a2)
         clr.w   8(a2)
 .tmr:   lea     obj_ix(pc),a0       ; slideshow: charge the beats
@@ -367,7 +370,15 @@ frame_loop:
 ; --------------------------------------------------------------- next object
 ; Advance obj_ix (wrapping), reset the show timer, and cache the new
 ; object's table pointers and counts in cur. Preserves d7, a4.
+; Also restarts the meter averaging window: it must not straddle the
+; switch, so every latch is pure for the object on screen, and the
+; meters stay blank until the first one lands.
 obj_next:
+        lea     headroom(pc),a0
+        clr.l   4(a0)               ; window: spins accumulator
+        clr.w   8(a0)               ; window: 2-beat loop count
+        move.w  #mwin,10(a0)        ; full window ahead
+        clr.w   18(a0)              ; no pure latch yet: meters blank
         lea     obj_ix(pc),a0
         move.w  (a0),d0
         addq.w  #1,d0
@@ -404,28 +415,31 @@ obj_next:
         rts
 
 ; ------------------------------------------------------------------- meters
-; Two 16-bit binary readouts (MSB left, 8-px cell per bit, dashed
-; ruler under each), averaged over the mwin-loop window:
-;   rows 240-242: average idle spins per loop (1 spin ~ 20 us)
-;   rows 245-247: 2-beat loops out of mwin (0 = pure 50 Hz)
+; Two decimal readouts (lib/draw_dec.asm: 6-digit field, 3x5 digits,
+; leading zeros blanked), averaged over the mwin-loop window:
+;   rows 240-244: average idle spins per loop (1 spin ~ 20 us)
+;   rows 246-250: 2-beat loops out of mwin (0 = pure 50 Hz)
+; Blank until the current object's first full window has latched
+; (obj_next restarts the window), so any visible number is pure.
 draw_meters:
-        lea     headroom+12(pc),a1
-        move.w  (a1)+,d0
+        move.w  headroom+18(pc),d0  ; pure latch for this object yet?
+        beq.s   .blank
+        move.w  headroom+12(pc),d0
         lea     240*scr_llen+48(a4),a0
-        bsr.s   draw_ro
-        move.w  (a1),d0
-        lea     245*scr_llen+48(a4),a0
-draw_ro:                            ; (fallthrough: 2nd readout's rts
-        moveq   #16-1,d2            ;  returns to draw_meters' caller)
-.cell:  moveq   #0,d1
-        add.w   d0,d0               ; MSB out into carry
-        bcc.s   .un
-        move.b  #$fc,d1             ; lit: 6 px block + 2 px gap
-.un:    move.b  d1,(a0)             ; green byte, 2 value rows
-        move.b  d1,scr_llen(a0)
-        move.b  #$fc,2*scr_llen(a0) ; ruler row
-        addq.l  #2,a0
-        dbf     d2,.cell
+        bsr     draw_dec
+        move.w  headroom+14(pc),d0
+        lea     246*scr_llen+48(a4),a0
+        bra     draw_dec            ; tail call: its rts returns
+.blank: lea     240*scr_llen+48(a4),a0  ; measuring: wipe both fields
+        bsr.s   .fld
+        lea     246*scr_llen+48(a4),a0
+.fld:   moveq   #5-1,d1             ; (fallthrough: 2nd field's rts
+        moveq   #0,d0               ;  returns to the caller)
+.row:   move.b  d0,(a0)
+        move.b  d0,2(a0)
+        move.b  d0,4(a0)
+        lea     scr_llen(a0),a0
+        dbf     d1,.row
         rts
 
 ; -------------------------------------------------------------- headroom bar
@@ -470,6 +484,7 @@ headroom:
         dc.w    0                   ; +12 latched avg spins (meter A)
         dc.w    0                   ; +14 latched 2-beat count (meter B)
         dc.w    1                   ; +16 beats of the last loop (1|2)
+        dc.w    0                   ; +18 pure-latch flag (0 blanks meters)
 
 obj_ix: dc.w    -1                  ; current object (armed by obj_next)
         dc.w    1                   ; +2 show time left, in beats
@@ -500,3 +515,4 @@ sv_stack:
 sv_stack_top:
 
         include "../lib/draw_line_w.asm"
+        include "../lib/draw_dec.asm"

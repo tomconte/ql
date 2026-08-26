@@ -139,7 +139,7 @@ fast path > entry slimming > mid-slope unroll.
 
 Instrumentation note: the live headroom bar teleports near the 20 ms
 boundary (one VBL more or less flips the beat count); the two averaged
-binary meters (avg idle spins + 2-beat-loops-of-64) are the reliable
+meters (avg idle spins + 2-beat loops of the window) are the reliable
 readout. The 2-beat counter IS the frame-rate meter for the 50 Hz push.
 
 ## The shape parade (shapes/) -- plausible game assets
@@ -156,10 +156,56 @@ engine limits (<=16 vertices/faces, projection-safe radius <=84).
 double-buffered, beat-scaled machinery. All five confirmed rendering
 correctly as solids.
 
-**Next session starts here**: a decimal readout routine (tiny 3x5
-digit font + divu-by-10 split) to replace binary cell-counting on the
-meters -- then per-object cost profiling of the parade, then engine
-features (input, multiple objects, clipping).
+**Decimal meters** (`lib/draw_dec.asm`): the binary cell meters are
+replaced by decimal readouts -- repeated divu #10 splits the word into
+digits, a 3x5 glyph font packs two digits per green byte (4-px pitch),
+6-digit right-aligned field with leading zeros blanked, every byte
+rewritten per call so the field self-erases. Same averaged values in
+the same places (avg idle spins on top, 2-beat loops of the 128-loop
+window below), now read directly instead of by counting cells.
+
+First reading (cube in the parade): 542 avg spins / 52 two-beat = avg
+work ~17.3 ms -- but PROVISIONAL: the free-running window straddled
+the fighter->cube switch, so part of that average is the fighter's.
+Fixed in the engine: `obj_next` now restarts the averaging window at
+every object switch and the meters stay **blank until the object's
+first full window latches**, so any visible number is pure for the
+shape on screen (showtime raised to 12 s: 1-3 pure latches show per
+slot; latch-to-latch scatter within a slot is the orientation mix,
+not contamination).
+
+**Per-object profile** (pure windows, one slot each):
+
+| object  | v/f/e   | avg spins | 2-beat/128 | avg work | eff fps |
+|---------|---------|-----------|------------|----------|---------|
+| cube    | 8/6/12  | 487       | 48         | 17.8 ms  | 36      |
+| dart    | 4/4/6   | 436       | 0          | 11.3 ms  | 50 lock |
+| tower   | 12/8/18 | 838       | 88         | 17.0 ms  | 30      |
+| mine    | 6/8/12  | 213       | 0          | 15.7 ms  | 50 lock |
+| fighter | 7/10/15 | 654       | 60         | 16.3 ms  | 34      |
+
+(avg work = avg loop - idle = (1 + 2beat/128) x 20 ms - spins x 20 us)
+
+What it says:
+
+- **Two assets already lock 50 Hz**: dart trivially (11.3 ms), mine
+  with ZERO 2-beat loops at 15.7 ms average -- a compact solid whose
+  worst orientation still fits the beat.
+- **The mean is not the gauge -- the swing is.** Tower averages less
+  work than the cube (17.0 vs 17.8 ms) yet spills 88/128 loops to the
+  cube's 48: the long prism's end-on/side-on extremes spread its work
+  distribution across the 20 ms line. The 2-beat counter keeps being
+  the honest meter.
+- **Edge count is a poor cost predictor** at this size: the cube's 12
+  long edges out-cost the fighter's 15 and the tower's 18 on average.
+  Projected pixels + erase area are what the beat buys.
+- Parade cube vs standalone cube: 17.8 ms / 48-of-128 vs 16.7 ms /
+  28-of-128 -- the generalized engine + decimal meters cost ~1 ms,
+  now measured with pure windows. Fine for an instrumented parade; a
+  game build would drop the meters.
+
+**Next session starts here**: engine features -- IPC keyboard input,
+multiple objects, clipping -- ahead of any inner-loop work.
 
 ## What this means for 3D (so far)
 
