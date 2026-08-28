@@ -17,10 +17,18 @@ $(NAME)_bin: $(NAME).asm sin.inc meshes.inc ../lib/draw_line_w.asm
 $(NAME).qlpak: $(NAME)_bin boot $(NAME).QCF ../tools/mkqlpak.ps1
 	pwsh -NoProfile -File ../tools/mkqlpak.ps1 -Name $(NAME) -DataSpace $(DATASPACE)
 
+mdv: $(NAME).mdv
+
+$(NAME).mdv: $(NAME)_bin boot ../tools/mkmdv.py
+	python ../tools/mkmdv.py --name $(NAME) --dataspace $(DATASPACE)
+
 run: $(NAME).qlpak
 	pwsh -NoProfile -Command "Start-Process -FilePath '$(QEMU)' -ArgumentList '$(NAME).qlpak'"
 
-clean:
-	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).qlpak, sin.inc, meshes.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+runmdv: $(NAME).mdv
+	pwsh -NoProfile -Command "Start-Process -FilePath '$(QEMU)' -ArgumentList '$(NAME)_mdv.QCF'"
 
-.PHONY: all run clean
+clean:
+	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).qlpak, $(NAME).mdv, sin.inc, meshes.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+
+.PHONY: all mdv run runmdv clean
