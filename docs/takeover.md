@@ -135,7 +135,10 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
 - Draw into the **back** buffer while the other is displayed; at VBL,
   flip with a single register write (`$00` or `$80` in mode 4). Only
   complete frames are ever shown — no tearing, however long drawing
-  takes (if it exceeds a frame you just flip at 25 Hz instead).
+  takes (if it exceeds a frame you just flip at 25 Hz instead). This
+  is the correct protocol; MiSTer-derived FPGA cores break it through
+  a core bug (see below) that gets fixed upstream, not worked around
+  here.
 - **Budget reality check** (measured in game8, stock-speed QL):
   OR-blitting eleven 8×16 mode 8 sprites plus a keyboard read sat right
   at the edge of the 20 ms frame and tipped over it; eight sprites run
@@ -178,6 +181,49 @@ $28000 (screen 1). `flip/flip.asm` is the worked example:
   paranoid program (or one loaded on a crowded 128 K machine) can check
   its own address at startup and, being PIC, copy itself somewhere safe
   with a plain loop.
+
+### Known core bug: MiSTer-derived cores latch the screen base early
+
+Found the hard way on the MEGA65 port of the MiSTer QL core (Aug 2026):
+the shapes parade showed every object half-erased, edges missing,
+blinking — while Q-emuLator was pixel-perfect.
+
+The MiSTer core (`MiSTer-devel/QL_MiSTer`, Till Harbaum's MiST core
+underneath — the base for several FPGA QL ports) commits the screen
+base **before** it raises the frame interrupt. In `rtl/zx8301.v` the
+`mc_stat` bit 7 value is latched into the video fetch address once per
+frame at line 257 (`v_cnt == V+1`), but `vs` — which sets the $18021
+frame bit in `rtl/zx8302.v` — only rises at line 281 (`v_cnt == V+vfp`,
+PAL front porch 25 lines). So the classic "wait for VBL, then flip"
+misses the latch by ~24 lines every time: the flip is applied one frame
+late, and in steady state **the displayed frame is always the buffer
+being erased and redrawn**. The ZX8302 side is implemented correctly
+(latched frame bit, one-shot write-1-to-clear ack); it is purely the
+latch-before-interrupt ordering. The one-line fix is to latch after
+`vs` rises (e.g. at `v_cnt == V+vfp+vsw`).
+
+**Status (Aug 2026):** reported upstream as
+[QL_MiSTer#9](https://github.com/MiSTer-devel/QL_MiSTer/issues/9)
+(issue text: `docs/mister-flip-latch-issue.md`). The Tang Nano port has the fix and
+displays our binaries correctly (verified); the MEGA65 port still shows
+the bug until the fix is merged; real QL not yet tested. We keep the
+classic protocol and do **not** work around the bug in our code.
+
+Why no workaround: flipping at draw-completion (before the wait) was
+tried and mostly works on the broken cores, but it only narrows the
+race — a loop finishing in the ~1.5 ms between the core's latch and its
+interrupt still misses silently, so shapes whose cost hovers around the
+18.4 ms boundary blink intermittently. Curing that needs a
+sit-out-a-frame heuristic on top, and a completion-time flip could
+tear mid-scan on a real QL if the real ZX8301 applies bit 7
+immediately (undocumented; QDOS never flips). Complexity and real-HW
+risk to paper over one core's bug — not worth it.
+
+Related: when the real ZX8301 applies the DB bit is still an open
+question. If real hardware ever shows problems with the classic
+protocol, revisit `docs/mister-flip-latch-issue.md` and the analysis
+above before inventing anything new. The ZX Spectrum Next QL core is an
+independent implementation — test before assuming either way.
 
 ## What you give up (future work)
 

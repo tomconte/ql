@@ -75,6 +75,15 @@ format spec in `docs/mdv-format.md`.
 11. Boot scripts use `EXEC mdv1_...`, not `flp1_`: Q-emuLator aliases
     MDV1_/FLP1_/WIN1_ to the same slot, so mdv1_ works for qlpaks *and*
     mdv images — flp1_ doesn't exist on a real QL or the Next core.
+12. **Double buffering is draw → wait for VBL → flip; don't add core
+    workarounds.** The MiSTer QL core latches the screen base ~24
+    lines before raising the frame interrupt, so on it (and the MEGA65
+    port until the upstream fix lands) the flip is a frame late and
+    shapes flicker. That's a core bug — reported upstream, already
+    fixed in the Tang Nano port. Flip-before-wait "fixes" were tried
+    and reverted (residual races, real-HW risk): status + analysis in
+    `docs/takeover.md` "Double buffering", issue text in
+    `docs/mister-flip-latch-issue.md`.
 
 ## Conventions
 
