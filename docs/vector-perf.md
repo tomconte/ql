@@ -204,6 +204,50 @@ What it says:
   now measured with pure windows. Fine for an instrumented parade; a
   game build would drop the meters.
 
+**Colour** (`lib/draw_line.asm`): mode 4 has three ink colours and the
+white drawer's speed comes from its byte-pair masks (`$8080`, `$ffff`,
+`$7f7f`...) ORed into both planes by one word op -- a single-plane mask
+would rotate into the other plane, and masking the colour per pixel
+would tax every colour. So colour is a dispatch, not a mask: `draw_line`
+takes the colour in d4 (mode 4 pixel bits: 1 red, 2 green, 3 white),
+tail-calls `draw_line_w` for white, and for red/green calls
+`draw_line_p`, the white drawer translated back to byte ops (verified
+instruction-for-instruction identical modulo op size and mask width).
+Green is the even byte of every screen word, red the odd one, and byte
+ops have no alignment constraint, so red is the green drawer with the
+screen base offset by one byte -- one `addq.l #1,a4` in the dispatcher.
+Per line the dispatch costs ~60 cycles against the measured ~1100-1400
+per-line overhead. The parade colours objects from the mesh directory
+(genmesh: cube white, dart red, tower green, mine white, fighter red);
+the per-line API is what the game will use.
+
+This also answers roadmap item 3 (white vs green lines): per pixel, a
+single-plane line is one byte RMW where white is one word RMW -- on the
+68008's 8-bit bus the word op costs two extra bus cycles (~8 clocks)
+per plot and the xfast full-byte writes likewise, so red/green should
+run slightly *faster* than white per pixel. Measured (pure windows,
+same meters; white rows from the table above; confirmed rendering on
+Q-emuLator and on the NanoQL Tang Nano core):
+
+| object  | colour | avg spins | 2-beat/128 | avg work | eff fps |
+|---------|--------|-----------|------------|----------|---------|
+| dart    | white  | 436       | 0          | 11.3 ms  | 50 lock |
+| dart    | red    | 445       | 0          | 11.1 ms  | 50 lock |
+| tower   | white  | 838       | 88         | 17.0 ms  | 30      |
+| tower   | green  | 721       | 71         | 16.7 ms  | 32      |
+| fighter | white  | 654       | 60         | 16.3 ms  | 34      |
+| fighter | red    | 308       | 16         | 16.3 ms  | 44      |
+
+Single-plane lines are cheaper, as predicted, but the mean barely
+moves (0.2-0.3 ms): the draw is ~11 ms of a ~17 ms loop and the bus
+saving is a fraction of that. What moves is the **spill count** --
+the fighter's 2-beat loops drop from 60 to 16 at the same average
+work, because its worst orientations sat just over the 20 ms line and
+the byte-op saving pushes them under. The swing rule again: near the
+beat boundary, a small per-pixel gain buys a large frame-rate gain.
+Rule of thumb for the game: white for the hero object, single-plane
+colours where the budget is tight.
+
 **Next session starts here**: engine features -- IPC keyboard input,
 multiple objects, clipping -- ahead of any inner-loop work.
 

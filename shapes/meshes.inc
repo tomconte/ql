@@ -224,16 +224,17 @@ m_fighter_e:
         dc.w    $0018
         dc.b    16,24
         dc.w    $0300
-; directory: nvtx-1, nfaces-1, nedges-1, v/f/e offsets from meshes
+; directory, 16 bytes per object: nvtx-1, nfaces-1, nedges-1, colour,
+; v/f/e offsets from meshes, pad
 nobjs       equ     5
 objdir:
-        dc.w    7,5,11
-        dc.w    m_cube_v-meshes,m_cube_f-meshes,m_cube_e-meshes
-        dc.w    3,3,5
-        dc.w    m_dart_v-meshes,m_dart_f-meshes,m_dart_e-meshes
-        dc.w    11,7,17
-        dc.w    m_tower_v-meshes,m_tower_f-meshes,m_tower_e-meshes
-        dc.w    5,7,11
-        dc.w    m_mine_v-meshes,m_mine_f-meshes,m_mine_e-meshes
-        dc.w    6,9,14
-        dc.w    m_fighter_v-meshes,m_fighter_f-meshes,m_fighter_e-meshes
+        dc.w    7,5,11,3    ; white
+        dc.w    m_cube_v-meshes,m_cube_f-meshes,m_cube_e-meshes,0
+        dc.w    3,3,5,1    ; red
+        dc.w    m_dart_v-meshes,m_dart_f-meshes,m_dart_e-meshes,0
+        dc.w    11,7,17,2    ; green
+        dc.w    m_tower_v-meshes,m_tower_f-meshes,m_tower_e-meshes,0
+        dc.w    5,7,11,3    ; white
+        dc.w    m_mine_v-meshes,m_mine_f-meshes,m_mine_e-meshes,0
+        dc.w    6,9,14,1    ; red
+        dc.w    m_fighter_v-meshes,m_fighter_f-meshes,m_fighter_e-meshes,0

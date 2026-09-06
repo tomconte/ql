@@ -10,12 +10,13 @@
 ; (the backface cull relies on it), <=16 vertices/faces, radius within
 ; the projection-safe bound. Per object: vertex words, face test
 ; triples (last face first: the cull loop's dbf counter is the bit
-; number), and 4-byte edge records i*4, j*4, two-face mask word.
+; number), 4-byte edge records i*4, j*4, two-face mask word, and a
+; colour (red, green or white) for the whole object.
 ;
 ; Everything else is the cube engine, measured in docs/vector-perf.md:
 ; MODE 4 takeover, double buffer, exact-mask movem erase (self-
 ; modifying bursts), 8.8-brad beat-scaled rotation, backface culling,
-; white edges via lib/draw_line_w.asm, live headroom bar + averaged
+; coloured edges via lib/draw_line.asm, live headroom bar + averaged
 ; decimal meters via lib/draw_dec.asm (top: avg idle spins, ~20 us
 ; each; bottom: 2-beat loops out of 128), profiling each OBJECT as
 ; it shows: the window restarts at every switch and the meters stay
@@ -316,7 +317,8 @@ frame_loop:
         move.w  (a3,d0.w),d0        ; x1
         move.w  2(a3,d2.w),d3       ; y2
         move.w  (a3,d2.w),d2        ; x2
-        bsr     draw_line_w
+        move.w  cur+18(pc),d4       ; the object's colour
+        bsr     draw_line
 .skip:  addq.l  #4,a2
         dbf     d6,.edge
         endc
@@ -387,17 +389,15 @@ obj_next:
         moveq   #0,d0
 .ok:    move.w  d0,(a0)
         move.w  #showtime,2(a0)     ; obj_time
-        move.w  d0,d1               ; directory entry = objdir + idx*12
-        lsl.w   #2,d1
-        move.w  d1,d2
-        add.w   d1,d1
-        add.w   d2,d1
+        move.w  d0,d1               ; directory entry = objdir + idx*16
+        lsl.w   #4,d1
         lea     objdir(pc),a1
         adda.w  d1,a1
         lea     cur(pc),a2
         move.w  (a1)+,12(a2)        ; nvtx-1
         move.w  (a1)+,14(a2)        ; nfaces-1
         move.w  (a1)+,16(a2)        ; nedges-1
+        move.w  (a1)+,18(a2)        ; colour
         lea     meshes(pc),a0
         move.l  a0,d0
         moveq   #0,d1
@@ -493,6 +493,7 @@ cur:    dc.l    0                   ; +0  vertex table   } cached by
         dc.l    0                   ; +4  face table     } obj_next
         dc.l    0                   ; +8  edge table
         dc.w    0,0,0               ; +12 nvtx-1, +14 nfaces-1, +16 nedges-1
+        dc.w    0                   ; +18 colour (draw_line code)
 
 ; per-buffer erase boxes: miny, nrows, end-of-span offset, longs/row
 bbox0:  dc.w    0,0,0,0             ; nrows = 0: nothing to erase yet
@@ -515,4 +516,5 @@ sv_stack:
 sv_stack_top:
 
         include "../lib/draw_line_w.asm"
+        include "../lib/draw_line.asm"
         include "../lib/draw_dec.asm"

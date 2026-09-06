@@ -102,8 +102,12 @@ format spec in `docs/mdv-format.md`.
   `sound_test/ipc_sound.asm`. Double-buffered programs: `flip/` (mode 4)
   and `flip8/` (mode 8) are the reference implementations — new work
   copies whichever mode matches.
-- 3D/vector work: `lib/draw_line_w.asm` is the optimized white line
-  drawer (register API, slope-classed fast path);
+- 3D/vector work: `lib/draw_line.asm` is the colour line entry
+  (`d4` = 1 red / 2 green / 3 white, register API, no clipping): white
+  tail-calls `lib/draw_line_w.asm` (word ops, both planes, slope-classed
+  fast path), red/green go to the single-plane byte-op twin
+  `draw_line_p` -- red is the green drawer with the screen base at
+  `a4+1`. Include both lib files;
   `lib/draw_dec.asm` prints a word as a 6-digit decimal readout
   (3x5 green digits, mode 4 — meters, future score displays); meshes are defined
   and validated in `tools/genmesh.py` (winding-consistent closed

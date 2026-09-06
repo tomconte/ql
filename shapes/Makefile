@@ -11,7 +11,7 @@ sin.inc: ../tools/gensin.py
 meshes.inc: ../tools/genmesh.py
 	python ../tools/genmesh.py > meshes.inc
 
-$(NAME)_bin: $(NAME).asm sin.inc meshes.inc ../lib/draw_line_w.asm
+$(NAME)_bin: $(NAME).asm sin.inc meshes.inc ../lib/draw_line_w.asm ../lib/draw_line.asm ../lib/draw_dec.asm
 	"$(VASM)" -m68008 -Fbin -o $@ $(NAME).asm
 
 $(NAME).qlpak: $(NAME)_bin boot $(NAME).QCF ../tools/mkqlpak.ps1
