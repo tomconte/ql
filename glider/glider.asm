@@ -1,13 +1,17 @@
-; glider.asm -- M1 flight rig for the hovercraft raid (docs/engine-spec.md)
+; glider.asm -- the hovercraft raid, M2 world (docs/engine-spec.md)
 ;
 ; First-person, yaw-only camera at a fixed height over a flat world:
 ; an IPC keyboard read on alternate frames (row 1: arrows + Enter), the
 ; section-4 flight model (ramped turn, thrust, drag = drift, brake then
-; reverse),
-; a world-aligned lattice of red ground dots, the fixed horizon, a
-; reticle and HUD readouts. No objects yet: the craft spawns on an
-; unbounded lattice. The rig exists to tune the flight constants (the
-; equ block below) by feel and to measure the lattice budget.
+; reverse), a world-aligned lattice of red ground dots, the fixed
+; horizon, a reticle and HUD readouts (M1, the flight rig), and now
+; wireframe objects on the lattice (M2): a static entity table (towers,
+; blocks, mines from meshes.inc), the camera transform, four-level
+; culling (world box, bounding sphere against the frustum, faces by
+; their planes with the eye in the mesh's frame, edges by outcodes),
+; near-plane and 2D clipping for the edges the line drawers cannot
+; take, and one erase box per drawn object. The flight constants (the
+; equ block below) were tuned by feel in M1.
 ;
 ; Scaffold from shapes/shapes.asm: MODE 4 takeover, double buffer with
 ; VBL flip, beat-scaled simulation (1|2 beats per loop), live headroom
@@ -74,6 +78,16 @@ nwin        equ     zfar/latd+1     ; half-window in cells (+1: the
                                     ; in-cell offset eats up to a cell)
 maxdots     equ     128             ; dot list capacity per buffer
 
+; ----- objects (spec sections 5.1, 5.2, 6). The near plane for meshes
+; is closer than the lattice's: their edges are clipped, the dots are
+; not. r_active bounds every camera-space coordinate to a word (the
+; frustum and the eye-in-mesh-frame products need that). Meshes,
+; planes and the directory come from meshes.inc (genmesh --game).
+znear_o     equ     32              ; object near plane (z' <= it: clipped)
+r_active    equ     2560            ; world box half-side: zfar + radius + slack
+maxobj      equ     16              ; erase boxes per buffer = objects drawn
+nent        equ     64              ; entity pool
+
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255
 hb_y        equ     254             ; bar top line (2 rows tall)
@@ -85,6 +99,7 @@ mshift      equ     7
 no_kbd      equ     0               ; skip the IPC keyboard read
 no_lat      equ     0               ; skip the lattice (erase still runs)
 no_hud      equ     0               ; skip the flight readouts
+no_obj      equ     0               ; skip the objects (box erase still runs)
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x
@@ -98,6 +113,76 @@ c_rev       equ     18              ; word, 1 = reversing
 c_s         equ     20              ; word, sin head (8.8)
 c_c         equ     22              ; word, cos head (8.8)
 c_size      equ     24
+
+; entity record (entpool, 16 bytes; the level table has the same shape)
+e_mesh      equ     0               ; word, directory index; -1 ends the pool
+e_flags     equ     2               ; word, 0 = inactive
+e_x         equ     4               ; word, world x (integer units)
+e_z         equ     6               ; word, world z
+e_y         equ     8               ; word, centre height over the ground
+e_head      equ     10              ; word, 8.8 brads
+e_hp        equ     12              ; reserved (M3)
+e_tmr       equ     14              ; reserved (M3)
+e_size      equ     16
+
+; mesh directory entry (objdir in meshes.inc, 32 bytes)
+od_nv       equ     0               ; nvtx-1
+od_nf       equ     2               ; nfaces-1
+od_ne       equ     4               ; nedges-1
+od_col      equ     6               ; draw_line colour
+od_v        equ     8               ; table offsets from meshes
+od_f        equ     10
+od_e        equ     12
+od_n        equ     14              ; face planes
+od_yb       equ     16              ; ybase
+od_rad      equ     18              ; bounding radius
+od_crad     equ     20              ; collision radius (M3)
+
+; camera block for the object stage (ocam)
+oc_px       equ     0               ; long, camera x, integer units
+oc_pz       equ     4               ; long
+oc_s        equ     8               ; word, sin head
+oc_c        equ     10              ; word, cos head
+oc_n        equ     12              ; word, objects drawn this frame
+
+; current object (cur)
+cu_v        equ     0               ; long, vertex table
+cu_e        equ     4               ; long, edge table
+cu_n        equ     8               ; long, plane table
+cu_nv       equ     12              ; nvtx-1
+cu_nf       equ     14              ; nfaces-1
+cu_ne       equ     16              ; nedges-1
+cu_col      equ     18              ; colour
+cu_xc       equ     20              ; centre in camera space
+cu_zc       equ     22
+cu_yc       equ     24
+cu_sa       equ     26              ; sin, cos of (object - camera) heading
+cu_ca       equ     28
+cu_vis      equ     30              ; face visibility mask
+cu_oc       equ     32              ; OR of the vertex outcodes
+cu_cnt      equ     34              ; loop counter
+cu_minx     equ     36              ; erase box accumulators
+cu_maxx     equ     38
+cu_miny     equ     40
+cu_maxy     equ     42
+cu_size     equ     44
+
+; vertex scratch record (vscr, 12 bytes; edge tables index by i*12)
+vs_x        equ     0               ; camera space x', y', z'
+vs_y        equ     2
+vs_z        equ     4
+vs_sx       equ     6               ; projected
+vs_sy       equ     8
+vs_oc       equ     10              ; outcode: 1 left, 2 right, 4 above,
+                                    ; 8 below, $10 behind the near plane
+; clip work area (cwrk): two vs records, A then B
+cw_x        equ     vs_x
+cw_y        equ     vs_y
+cw_z        equ     vs_z
+cw_sx       equ     vs_sx
+cw_sy       equ     vs_sy
+cw_oc       equ     vs_oc
+cw_size     equ     12
 
 ; wbound: narrow the row's cell range [d4,d5] with the half-plane test
 ; whose record (DF.l, (2*nwin)*DF.l, DF>>16.w, pad) is at (a0), for
@@ -148,6 +233,22 @@ wbound  macro
 .wz\@:  tst.l   d0                  ; DF = 0: f constant along the row
         bmi     \1
 .wx\@:  lea     12(a0),a0
+        endm
+
+; beat_poll: consume a frame edge that fired since the last poll and
+; count it in xbeats. The frame bit cannot count two edges, so the work
+; is polled at stage boundaries (after the lattice, after each drawn
+; object; every stage is under a beat) and the loop's beats = 1 + the
+; edges consumed. Register-transparent.
+beat_poll macro
+        btst    #pc__frame,pc_intr
+        beq.s   .bp\@
+        move.b  #1<<pc__frame,pc_intr
+        move.l  a0,-(sp)
+        lea     xbeats(pc),a0
+        addq.w  #1,(a0)
+        move.l  (sp)+,a0
+.bp\@:
         endm
 
 ; ---------------------------------------------------------------- job header
@@ -207,6 +308,16 @@ main:
         cmp.w   #zfar,d2
         blt.s   .tab
 
+        lea     level(pc),a0        ; static entities into the pool
+        lea     entpool(pc),a1
+.lvl:   move.w  (a0),d0
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        tst.w   d0
+        bpl.s   .lvl                ; copies the -1 terminator too
+
         bsr     craft_reset         ; spawn in the open field
         move.b  #1<<pc__frame,pc_intr   ; discard any pending frame bit
         moveq   #1,d7               ; back buffer index: screen 1
@@ -217,7 +328,63 @@ frame_loop:
         tst.w   d7
         beq.s   .bb0
         lea     scr1,a4
-.bb0:
+.bb0:   lea     xbeats(pc),a0
+        clr.w   (a0)                ; frame edges consumed during the work
+
+; ----- erase the object boxes this buffer held two frames ago (parade
+; format: miny, nrows, end-of-span offset, L longs per row). Per row
+; eight zeroed registers go out in movem bursts of 32 bytes: the full
+; bursts via a computed jump, the remainder through a mask patched per
+; box (emtab); L reaches 32 for a screen-wide object.
+        bsr     bbox_sel            ; a6 = this buffer's box list
+        move.w  (a6)+,d0
+        beq.s   .noeb
+        lsl.w   #3,d0
+        lea     (a6,d0.w),a0
+        move.l  a0,-(sp)            ; end of the records
+.ebox:  move.w  (a6)+,d1            ; miny
+        move.w  (a6)+,d2            ; nrows
+        move.w  (a6)+,d3            ; end-of-span offset
+        move.w  (a6)+,d4            ; L
+        lsl.w   #7,d1
+        add.w   d3,d1
+        lea     (a4,d1.w),a0        ; end of the first row's span
+        move.w  d4,d5
+        lsr.w   #3,d5               ; full bursts
+        neg.w   d5
+        addq.w  #4,d5
+        lsl.w   #2,d5               ; jump offset: skip 4 - full bursts
+        move.w  d4,d0
+        and.w   #7,d0
+        add.w   d0,d0
+        lea     emtab(pc),a1
+        move.w  (a1,d0.w),d0        ; remainder mask
+        lea     .erm+2(pc),a1
+        move.w  d0,(a1)
+        lsl.w   #2,d4
+        add.w   #scr_llen,d4        ; row stride = 128 + 4L
+        moveq   #0,d0               ; eight zeros for the bursts
+        moveq   #0,d1
+        moveq   #0,d3
+        moveq   #0,d6
+        suba.l  a1,a1
+        suba.l  a2,a2
+        suba.l  a3,a3
+        suba.l  a5,a5
+.erow:  jmp     .ej(pc,d5.w)
+.ej:    movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+.erm:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)   ; mask patched above
+        adda.w  d4,a0
+        subq.w  #1,d2
+        bne.s   .erow
+        cmpa.l  (sp),a6
+        blo.s   .ebox
+        addq.l  #4,sp
+.noeb:
+
 ; ----- erase the dots this buffer held two frames ago (red byte AND)
         bsr     dots_sel            ; a1 = this buffer's dot list
         move.w  (a1)+,d0            ; count
@@ -415,15 +582,334 @@ frame_loop:
         lsr.l   #2,d0
         move.w  d0,(a1)
         endc
+        beat_poll
 
-; ----- horizon: full-width white line with a 16-px gap at the centre,
-; every frame (nothing moves it)
+; ----- horizon: full-width red line with a 16-px gap at the centre,
+; every frame (nothing moves it, but erase boxes cut it). Red like the
+; lattice since M2: a white line through the red mine sitting on it
+; (hover height) read badly.
         lea     horizon*scr_llen(a4),a0
-        moveq   #-1,d0
+        move.l  #$00ff00ff,d0       ; red plane = the odd bytes
         moveq   #32-1,d1
 .hz:    move.l  d0,(a0)+
         dbf     d1,.hz
         clr.l   horizon*scr_llen+62(a4)         ; gap: x 248..263
+
+; ----- objects: every active entity through the four-level cull (world
+; box, bounding sphere against the frustum, faces by their planes with
+; the eye in the mesh's frame, edges by outcodes), then its vertices
+; into camera space and on screen, and its edges drawn: straight to
+; draw_line when every vertex is on screen, else through clip_edge.
+; Across the stage a4 = back buffer, a5 = entity, d7 = buffer index;
+; draw_line trashes a0/a1, so a1 (cur) is reloaded after every line.
+        ifeq    no_obj
+        lea     craft(pc),a0
+        lea     ocam(pc),a1
+        move.l  c_px(a0),d0
+        asr.l   #8,d0
+        move.l  d0,oc_px(a1)        ; camera position, integer units
+        move.l  c_pz(a0),d0
+        asr.l   #8,d0
+        move.l  d0,oc_pz(a1)
+        move.w  c_s(a0),oc_s(a1)
+        move.w  c_c(a0),oc_c(a1)
+        clr.w   oc_n(a1)
+        bsr     bbox_sel
+        clr.w   (a6)                ; this buffer's box list starts empty
+        lea     entpool(pc),a5
+.ent:   tst.w   e_mesh(a5)
+        bmi     .edone              ; end of the pool
+        tst.w   e_flags(a5)
+        beq     .enext              ; inactive
+; --- world box: |dx|, |dz| < r_active, as longs (the lattice is unbounded)
+        move.w  e_x(a5),d0
+        ext.l   d0
+        sub.l   ocam+oc_px(pc),d0   ; dx
+        move.l  d0,d1
+        bpl.s   .bx
+        neg.l   d1
+.bx:    cmp.l   #r_active,d1
+        bge     .enext
+        move.w  e_z(a5),d2
+        ext.l   d2
+        sub.l   ocam+oc_pz(pc),d2   ; dz
+        move.l  d2,d1
+        bpl.s   .bz
+        neg.l   d1
+.bz:    cmp.l   #r_active,d1
+        bge     .enext
+; --- centre into camera space (spec 5.1):
+;   xc = (dx*c - dz*s) >> 8,  zc = (dz*c + dx*s) >> 8,  yc = cam_h - e_y
+        move.w  ocam+oc_s(pc),d3
+        move.w  ocam+oc_c(pc),d4
+        move.w  d0,d1
+        muls.w  d4,d1               ; dx*c
+        move.w  d2,d5
+        muls.w  d3,d5               ; dz*s
+        sub.l   d5,d1
+        asr.l   #8,d1               ; xc
+        muls.w  d4,d2               ; dz*c
+        muls.w  d3,d0               ; dx*s
+        add.l   d0,d2
+        asr.l   #8,d2               ; zc
+        move.w  #cam_h,d3
+        sub.w   e_y(a5),d3          ; yc (y down: the eye is above the ground)
+; --- frustum on the bounding sphere. Conservative forms (never reject
+; a sphere touching the view volume, checked in the M2 model): the side
+; planes at 1.5r (> r*sqrt2 for 45-degree planes), the top and bottom
+; planes at 2r against the 0.47/0.935 slopes of the shifted viewport.
+        move.w  e_mesh(a5),d0
+        lsl.w   #5,d0
+        lea     objdir(pc),a0
+        adda.w  d0,a0               ; a0 = directory entry
+        move.w  od_rad(a0),d4       ; r
+        move.w  d2,d0
+        add.w   d4,d0
+        cmp.w   #znear_o,d0
+        blt     .enext              ; wholly behind the near plane
+        move.w  d1,d0
+        bpl.s   .fx
+        neg.w   d0
+.fx:    sub.w   d2,d0               ; |xc| - zc
+        move.w  d4,d5
+        asr.w   #1,d5
+        add.w   d4,d5               ; 1.5 r
+        cmp.w   d5,d0
+        bgt     .enext              ; wholly outside the 90-degree FOV
+        move.w  d4,d5
+        add.w   d5,d5               ; 2r
+        move.w  d3,d0
+        sub.w   d2,d0               ; yc - zc
+        cmp.w   d5,d0
+        bgt     .enext              ; wholly below the play area
+        move.w  d2,d0
+        asr.w   #1,d0
+        add.w   d3,d0
+        add.w   d5,d0               ; yc + zc/2 + 2r
+        bmi     .enext              ; wholly above it
+        bsr     bbox_sel
+        cmp.w   #maxobj,(a6)
+        bge     .enext              ; no erase box left: not drawn
+; --- cache the object: tables, counts, colour, centre, and the angle
+; a = object heading - camera heading (the yaw the mesh is drawn at)
+        lea     cur(pc),a1
+        move.w  d1,cu_xc(a1)
+        move.w  d2,cu_zc(a1)
+        move.w  d3,cu_yc(a1)
+        move.w  od_nv(a0),cu_nv(a1)
+        move.w  od_nf(a0),cu_nf(a1)
+        move.w  od_ne(a0),cu_ne(a1)
+        move.w  od_col(a0),cu_col(a1)
+        lea     meshes(pc),a2
+        move.l  a2,d0
+        moveq   #0,d5
+        move.w  od_v(a0),d5
+        add.l   d0,d5
+        move.l  d5,cu_v(a1)
+        moveq   #0,d5
+        move.w  od_e(a0),d5
+        add.l   d0,d5
+        move.l  d5,cu_e(a1)
+        moveq   #0,d5
+        move.w  od_n(a0),d5
+        add.l   d0,d5
+        move.l  d5,cu_n(a1)
+        move.w  e_head(a5),d0
+        sub.w   craft+c_head(pc),d0
+        lsr.w   #8,d0               ; integer brad
+        add.w   d0,d0
+        lea     sintab(pc),a2
+        move.w  (a2,d0.w),d5        ; sa
+        move.w  d5,cu_sa(a1)
+        add.w   #128,d0             ; cos = sin(a + 64)
+        and.w   #511,d0
+        move.w  (a2,d0.w),d6        ; ca
+        move.w  d6,cu_ca(a1)
+        clr.w   cu_oc(a1)
+        move.w  #511,cu_minx(a1)    ; empty box: minx > maxx
+        clr.w   cu_maxx(a1)
+        move.w  #playbot,cu_miny(a1)
+        clr.w   cu_maxy(a1)
+; --- the eye in the mesh's frame: the inverse of the vertex transform
+; below applied to the camera origin,
+;   ex = (zc*sa - xc*ca) >> 8,  ez = -((zc*ca + xc*sa) >> 8),  ey = -yc
+        move.w  d2,d0
+        muls.w  d5,d0               ; zc*sa
+        move.w  d1,d4
+        muls.w  d6,d4               ; xc*ca
+        sub.l   d4,d0
+        asr.l   #8,d0               ; ex
+        move.w  d2,d4
+        muls.w  d6,d4               ; zc*ca
+        muls.w  d5,d1               ; xc*sa
+        add.l   d1,d4
+        asr.l   #8,d4
+        neg.w   d4                  ; ez
+        neg.w   d3                  ; ey
+; --- faces: bit f of the visibility mask when the eye is on the outer
+; side of face f's plane, n.e > d. Records are last-face-first, so the
+; dbf counter is the bit number (as in the parade's cross test).
+        move.l  cu_n(a1),a0
+        move.w  cu_nf(a1),d6
+        moveq   #0,d5
+.face:  move.w  (a0)+,d1
+        muls.w  d0,d1               ; nx*ex
+        move.w  (a0)+,d2
+        muls.w  d3,d2               ; ny*ey
+        add.l   d2,d1
+        move.w  (a0)+,d2
+        muls.w  d4,d2               ; nz*ez
+        add.l   d2,d1
+        cmp.l   (a0)+,d1            ; against d
+        ble.s   .hid
+        bset    d6,d5
+.hid:   dbf     d6,.face
+        move.w  d5,cu_vis(a1)
+; --- vertices into camera space (the parade's yaw formula plus the
+; centre), projected with outcodes into vscr; a vertex at or behind
+; the near plane gets outcode $10 and no projection
+;   x' = (x*ca + z*sa) >> 8 + xc,  z' = (z*ca - x*sa) >> 8 + zc,  y' = y + yc
+        move.l  cu_v(a1),a0
+        lea     vscr(pc),a2
+        move.w  cu_nv(a1),d6
+        move.w  cu_sa(a1),d4
+        move.w  cu_ca(a1),d5
+.vtx:   move.w  (a0)+,d0            ; x
+        move.w  (a0)+,d1            ; y
+        move.w  (a0)+,d2            ; z
+        move.w  d0,d3
+        muls.w  d5,d3               ; x*ca
+        muls.w  d4,d0               ; x*sa
+        move.w  d2,a3               ; park z
+        muls.w  d4,d2               ; z*sa
+        add.l   d2,d3
+        asr.l   #8,d3
+        add.w   cu_xc(a1),d3        ; x'
+        move.w  a3,d2
+        muls.w  d5,d2               ; z*ca
+        sub.l   d0,d2
+        asr.l   #8,d2
+        add.w   cu_zc(a1),d2        ; z'
+        add.w   cu_yc(a1),d1        ; y'
+        move.w  d3,(a2)+
+        move.w  d1,(a2)+
+        move.w  d2,(a2)+
+        cmp.w   #znear_o+1,d2
+        blt.s   .vnear
+        move.w  d3,d0
+        bsr     proj_oc             ; d0 = sx, d1 = sy, d3 = outcode
+        move.w  d0,(a2)+
+        move.w  d1,(a2)+
+        move.w  d3,(a2)+
+        or.w    d3,cu_oc(a1)
+        dbf     d6,.vtx
+        bra.s   .vdone
+.vnear: addq.l  #4,a2               ; no projection
+        move.w  #$10,(a2)+
+        or.w    #$10,cu_oc(a1)
+        dbf     d6,.vtx
+.vdone:
+; --- edges whose two faces are not both hidden. a6 parks the
+; visibility mask (draw_line leaves a2, a3, a5, a6, d6, d7 alone).
+        move.l  cu_e(a1),a2
+        lea     vscr(pc),a3
+        move.w  cu_vis(a1),a6
+        move.w  cu_ne(a1),cu_cnt(a1)
+        tst.w   cu_oc(a1)
+        bne.s   .cedge              ; some vertex off screen: clip path
+.edge:  move.w  a6,d0
+        and.w   2(a2),d0            ; edge's two-face mask vs visibility
+        beq.s   .eskip
+        moveq   #0,d0
+        move.b  (a2),d0             ; vertex offsets (pre-multiplied by 12)
+        moveq   #0,d2
+        move.b  1(a2),d2
+        move.w  vs_sy(a3,d0.w),d1
+        move.w  vs_sx(a3,d0.w),d0
+        move.w  vs_sy(a3,d2.w),d3
+        move.w  vs_sx(a3,d2.w),d2
+        bsr     bb_ext
+        move.w  cu_col(a1),d4
+        bsr     draw_line
+        lea     cur(pc),a1
+.eskip: addq.l  #4,a2
+        subq.w  #1,cu_cnt(a1)
+        bge.s   .edge
+        bra     .box
+.cedge: move.w  a6,d0
+        and.w   2(a2),d0
+        beq     .cskip
+        moveq   #0,d0
+        move.b  (a2),d0
+        moveq   #0,d2
+        move.b  1(a2),d2
+        move.w  vs_oc(a3,d0.w),d4
+        move.w  vs_oc(a3,d2.w),d5
+        move.w  d4,d1
+        or.w    d5,d1
+        beq.s   .cin                ; both on screen: straight draw
+        and.w   d5,d4
+        bne     .cskip              ; both past one edge, or both behind
+        lea     cwrk(pc),a0         ; copy both records for clip_edge
+        lea     (a3,d0.w),a1
+        move.l  (a1)+,(a0)+
+        move.l  (a1)+,(a0)+
+        move.l  (a1)+,(a0)+
+        lea     (a3,d2.w),a1
+        move.l  (a1)+,(a0)+
+        move.l  (a1)+,(a0)+
+        move.l  (a1)+,(a0)+
+        bsr     clip_edge           ; d0-d3 = segment, d4 = 0 if none
+        lea     cur(pc),a1
+        tst.w   d4
+        beq.s   .cskip
+        bra.s   .cdrw
+.cin:   move.w  vs_sy(a3,d0.w),d1
+        move.w  vs_sx(a3,d0.w),d0
+        move.w  vs_sy(a3,d2.w),d3
+        move.w  vs_sx(a3,d2.w),d2
+.cdrw:  bsr     bb_ext
+        move.w  cu_col(a1),d4
+        bsr     draw_line
+        lea     cur(pc),a1
+.cskip: addq.l  #4,a2
+        subq.w  #1,cu_cnt(a1)
+        bge     .cedge
+; --- the erase box for this buffer's next pass (parade format) when
+; anything was drawn; count the object; poll the frame edge
+.box:   move.w  cu_minx(a1),d0
+        move.w  cu_maxx(a1),d1
+        cmp.w   d1,d0
+        bgt     .enext              ; nothing drawn
+        move.w  cu_miny(a1),d2
+        move.w  cu_maxy(a1),d3
+        bsr     bbox_sel            ; a6 = box list
+        move.w  (a6),d4
+        addq.w  #1,(a6)
+        lsl.w   #3,d4
+        lea     2(a6,d4.w),a0       ; the new record
+        move.w  d2,(a0)+            ; miny
+        sub.w   d2,d3
+        addq.w  #1,d3
+        move.w  d3,(a0)+            ; nrows
+        lsr.w   #5,d0               ; 32-px (8-byte) units
+        lsr.w   #5,d1
+        sub.w   d0,d1               ; units spanned - 1
+        lsl.w   #3,d0               ; byte offset of the first unit
+        add.w   d1,d1
+        addq.w  #2,d1               ; L = 2 longs per unit, <= 32
+        move.w  d1,d4
+        lsl.w   #2,d4               ; 4L bytes per row
+        add.w   d4,d0
+        move.w  d0,(a0)+            ; end-of-span offset
+        move.w  d1,(a0)             ; L
+        lea     ocam(pc),a0
+        addq.w  #1,oc_n(a0)
+        beat_poll
+.enext: lea     e_size(a5),a5
+        bra     .ent
+.edone:
+        endc
 
 ; ----- reticle: green gunsight around the aim point (256, horizon).
 ; Every target at hover height projects onto the horizon row whatever
@@ -440,21 +926,18 @@ frame_loop:
         lea     scr_llen(a1),a1
         dbf     d1,.ret
 
-; ----- HUD readouts, headroom bar, meters, then VBL sync + flip. A
-; pending frame bit at end-of-work marks a 2-beat loop; consume it,
-; wait for the next real edge (flips stay VBL-aligned), consume that
-; too so the next loop's test is honest.
+; ----- HUD readouts, headroom bar, meters, then VBL sync + flip. The
+; frame edges consumed during the work (beat_poll at the stage
+; boundaries, plus one last poll here) are the loop's extra beats;
+; then wait for the next real edge (flips stay VBL-aligned) and consume
+; that too so the next loop's count is honest.
         ifeq    no_hud
         bsr     draw_hud
         endc
         bsr     draw_hbar
         bsr     draw_meters
-        moveq   #0,d6               ; d6 = 1 if this was a 2-beat loop
-        btst    #pc__frame,pc_intr
-        beq.s   .onb
-        moveq   #1,d6
-        move.b  #1<<pc__frame,pc_intr   ; consume the mid-work edge
-.onb:
+        beat_poll
+        move.w  xbeats(pc),d6       ; d6 = extra beats of this loop (0..2)
 ; ----- keyboard: one IPC round trip for row 1, after the work and its
 ; beat classification, before the wait. At the top of the loop it
 ; wrecked the meters on Q-emuLator (47% spurious 2-beat loops, min idle
@@ -687,6 +1170,189 @@ dots_sel:
         lea     dots1(pc),a1
 .d0:    rts
 
+; ---------------------------------------------------------- box list select
+; a6 = the erase-box list of back buffer d7 (count word, then maxobj
+; records of miny, nrows, end-of-span offset, L). Preserves the rest.
+bbox_sel:
+        lea     bbox0(pc),a6
+        tst.w   d7
+        beq.s   .b0
+        lea     bbox1(pc),a6
+.b0:    rts
+
+; --------------------------------------------------------------- box extend
+; Grow the current object's erase box (cur, a1) by the on-screen
+; segment d0,d1 - d2,d3. Preserves every register.
+bb_ext:
+        cmp.w   cu_minx(a1),d0
+        bge.s   .x1
+        move.w  d0,cu_minx(a1)
+.x1:    cmp.w   cu_maxx(a1),d0
+        ble.s   .x2
+        move.w  d0,cu_maxx(a1)
+.x2:    cmp.w   cu_minx(a1),d2
+        bge.s   .x3
+        move.w  d2,cu_minx(a1)
+.x3:    cmp.w   cu_maxx(a1),d2
+        ble.s   .y0
+        move.w  d2,cu_maxx(a1)
+.y0:    cmp.w   cu_miny(a1),d1
+        bge.s   .y1
+        move.w  d1,cu_miny(a1)
+.y1:    cmp.w   cu_maxy(a1),d1
+        ble.s   .y2
+        move.w  d1,cu_maxy(a1)
+.y2:    cmp.w   cu_miny(a1),d3
+        bge.s   .y3
+        move.w  d3,cu_miny(a1)
+.y3:    cmp.w   cu_maxy(a1),d3
+        ble.s   .y4
+        move.w  d3,cu_maxy(a1)
+.y4:    rts
+
+; ------------------------------------------------------ project + outcode
+; proj_oc: d0 = x', d1 = y', d2 = z' (> 0) -> d0 = sx, d1 = sy, d3 =
+; outcode (spec 5.1: sx = 256 + x'*256/z', sy = horizon + y'*yfocal/z').
+; outcode: d0 = sx, d1 = sy -> d3. Both trash only d0, d1, d3.
+proj_oc:
+        ext.l   d0
+        asl.l   #8,d0
+        divs.w  d2,d0
+        add.w   #256,d0             ; sx
+        muls.w  #yfocal,d1
+        divs.w  d2,d1
+        add.w   #horizon,d1         ; sy
+outcode:
+        moveq   #0,d3
+        tst.w   d0
+        bpl.s   .o1
+        moveq   #1,d3               ; left of the screen
+.o1:    cmp.w   #511,d0
+        ble.s   .o2
+        addq.w  #2,d3               ; right
+.o2:    tst.w   d1
+        bpl.s   .o3
+        addq.w  #4,d3               ; above
+.o3:    cmp.w   #playbot,d1
+        ble.s   .o4
+        addq.w  #8,d3               ; below the play area
+.o4:    rts
+
+; ---------------------------------------------------------------- clip edge
+; In: cwrk holds two vertex records A, B (vs_* layout), not both behind
+; the near plane and not both past the same screen edge. A record with
+; outcode $10 (z' <= znear_o) is moved along the edge to z' = znear_o
+; (parametric, t in 0.15 fixed point: one divs, two muls) and projected;
+; then Cohen-Sutherland against 0..511 x 0..playbot, one muls + divs
+; per boundary crossed (the outside endpoint moves to the boundary of
+; its lowest set bit; every step clears a bit for good, so at most a
+; few rounds -- a guard drops the edge after eight).
+; Out: d0-d3 = x1,y1,x2,y2 on screen and d4 = 1, or d4 = 0 for nothing.
+; Trashes d0-d5, a0, a1.
+clip_edge:
+        lea     cwrk(pc),a0
+        lea     cw_size(a0),a1
+        btst    #4,cw_oc+1(a0)      ; A behind the near plane?
+        bne.s   .near
+        btst    #4,cw_oc+1(a1)      ; B?
+        beq.s   .cs
+        exg     a0,a1               ; the near one at a0
+.near:  move.w  #znear_o,d0
+        sub.w   cw_z(a0),d0         ; znear_o - zA (>= 0)
+        ext.l   d0
+        asl.l   #8,d0
+        asl.l   #7,d0               ; << 15
+        move.w  cw_z(a1),d1
+        sub.w   cw_z(a0),d1         ; zB - zA (> 0)
+        divs.w  d1,d0               ; t = 0.15 fraction along A->B
+        move.w  cw_x(a1),d1
+        sub.w   cw_x(a0),d1
+        muls.w  d0,d1
+        asr.l   #8,d1
+        asr.l   #7,d1
+        add.w   cw_x(a0),d1         ; x at the near plane
+        move.w  cw_y(a1),d2
+        sub.w   cw_y(a0),d2
+        muls.w  d0,d2
+        asr.l   #8,d2
+        asr.l   #7,d2
+        add.w   cw_y(a0),d2         ; y
+        move.w  d1,d0
+        move.w  d2,d1
+        move.w  #znear_o,d2
+        bsr     proj_oc
+        move.w  d0,cw_sx(a0)
+        move.w  d1,cw_sy(a0)
+        move.w  d3,cw_oc(a0)
+        lea     cwrk(pc),a0
+        lea     cw_size(a0),a1
+.cs:    move.w  #8,-(sp)            ; round guard
+.round: move.w  cw_oc(a0),d4
+        move.w  cw_oc(a1),d5
+        move.w  d4,d0
+        or.w    d5,d0
+        beq     .acc
+        and.w   d5,d4
+        bne     .rej
+        subq.w  #1,(sp)
+        bmi     .rej
+        tst.w   cw_oc(a0)
+        bne.s   .p
+        exg     a0,a1               ; P (a0) = the outside endpoint
+.p:     move.w  cw_oc(a0),d4
+        move.w  cw_sx(a0),d0        ; x1, y1 = P
+        move.w  cw_sy(a0),d1
+        move.w  cw_sx(a1),d2        ; x2, y2 = Q
+        move.w  cw_sy(a1),d3
+        sub.w   d0,d2               ; dx
+        sub.w   d1,d3               ; dy
+        btst    #2,d4
+        beq.s   .n4
+        neg.w   d1                  ; top: x += dx*(0 - y1)/dy, y = 0
+        muls.w  d1,d2
+        divs.w  d3,d2
+        add.w   d2,d0
+        moveq   #0,d1
+        bra.s   .put
+.n4:    btst    #3,d4
+        beq.s   .n8
+        move.w  #playbot,d5         ; bottom: x += dx*(playbot - y1)/dy
+        sub.w   d1,d5
+        muls.w  d5,d2
+        divs.w  d3,d2
+        add.w   d2,d0
+        move.w  #playbot,d1
+        bra.s   .put
+.n8:    btst    #0,d4
+        beq.s   .n1
+        neg.w   d0                  ; left: y += dy*(0 - x1)/dx, x = 0
+        muls.w  d0,d3
+        divs.w  d2,d3
+        add.w   d3,d1
+        moveq   #0,d0
+        bra.s   .put
+.n1:    move.w  #511,d5             ; right: y += dy*(511 - x1)/dx
+        sub.w   d0,d5
+        muls.w  d5,d3
+        divs.w  d2,d3
+        add.w   d3,d1
+        move.w  #511,d0
+.put:   move.w  d0,cw_sx(a0)
+        move.w  d1,cw_sy(a0)
+        bsr     outcode             ; d3 from d0, d1
+        move.w  d3,cw_oc(a0)
+        bra     .round
+.acc:   addq.l  #2,sp
+        move.w  cw_sx(a0),d0
+        move.w  cw_sy(a0),d1
+        move.w  cw_sx(a1),d2
+        move.w  cw_sy(a1),d3
+        moveq   #1,d4
+        rts
+.rej:   addq.l  #2,sp
+        moveq   #0,d4
+        rts
+
 ; ------------------------------------------------------------- wedge record
 ; d0.w = w (trig sum, 8.8), a0 -> 12-byte record: DF = w*latd (16.16),
 ; (2*nwin)*DF, DF>>16. Trashes d0, d1, d4; advances a0.
@@ -705,10 +1371,11 @@ wdg_put:
         rts
 
 ; ---------------------------------------------------------------- HUD readouts
-; Three decimal fields on rows 242-246 (lib/draw_dec.asm, self-erasing):
-;   green byte 0:  forward speed, tenths of a unit/beat (24.0 -> 240)
-;   green byte 8:  drift = sideways speed, tenths (the drag_shift feel)
-;   green byte 16: heading, integer brads 0..255
+; Four decimal fields (lib/draw_dec.asm, self-erasing):
+;   rows 242-246, green byte 0:  forward speed, tenths of a unit/beat
+;                 green byte 8:  drift = sideways speed, tenths
+;                 green byte 16: heading, integer brads 0..255
+;   rows 248-252, green byte 0:  objects drawn this frame
 ; The speeds are magnitudes: in reverse the dots flow the other way.
 ; Refreshed every 4th frame (drawn twice, once per buffer): five
 ; draw_dec calls a frame cost ~4 ms, a third of the original budget.
@@ -744,6 +1411,9 @@ draw_hud:
         move.w  craft+c_head(pc),d0
         lsr.w   #8,d0
         lea     242*scr_llen+16(a4),a0
+        bsr     draw_dec
+        move.w  ocam+oc_n(pc),d0    ; objects drawn this frame
+        lea     248*scr_llen(a4),a0
         bra     draw_dec            ; tail call
 .skip:  rts
 .tenths:                            ; d0.l 16.16 -> |d0| in tenths (word)
@@ -759,7 +1429,7 @@ draw_hud:
 ; bytes 48, 56, 64 (x 192, 224, 256):
 ;   rows 242-246: avg idle spins per loop (1 spin ~ 20 us) | avg spins
 ;                 on buffer-0 loops | min spins in the window
-;   rows 248-252: 2-beat loops out of mwin (0 = pure 50 Hz) | avg spins
+;   rows 248-252: extra beats in the window (0 = pure 50 Hz) | avg spins
 ;                 on buffer-1 loops | max spins in the window
 ; Blank until the first full window has latched; then drawn only in
 ; the two frames after each latch (one per buffer), since the values
@@ -834,15 +1504,18 @@ lst_max:
         dc.l    0                   ; this buffer's dot list limit
 hud_tick:
         dc.w    0                   ; readout refresh phase
+xbeats: dc.w    0                   ; frame edges consumed during the work
+ocam:   ds.b    16                  ; object-stage camera block (oc_*)
+cur:    ds.b    cu_size             ; current object (cu_*)
 
 headroom:
         dc.l    0                   ; idle spins in last loop's VBL wait
         dc.l    0                   ; +4  window: spins accumulator
-        dc.w    0                   ; +8  window: 2-beat loop count
+        dc.w    0                   ; +8  window: extra beats
         dc.w    mwin                ; +10 loops left in the window
         dc.w    0                   ; +12 latched avg spins (meter A)
-        dc.w    0                   ; +14 latched 2-beat count (meter B)
-        dc.w    1                   ; +16 beats of the last loop (1|2)
+        dc.w    0                   ; +14 latched extra beats (meter B)
+        dc.w    1                   ; +16 beats of the last loop (1..3)
         dc.w    0                   ; +18 frames left to draw the meters
         dc.l    0                   ; +20 window: spins on buffer-0 loops
         dc.l    0                   ; +24 window: spins on buffer-1 loops
@@ -857,6 +1530,57 @@ dots0:  dc.w    0
 dots1:  dc.w    0
         ds.w    (maxdots+2*nwin+1)*2
 
+; object scratch: transformed vertices, the clip work area, and the
+; per-buffer erase-box lists (count, then maxobj parade-format records)
+vscr:   ds.b    16*12
+cwrk:   ds.b    2*cw_size
+bbox0:  dc.w    0
+        ds.w    maxobj*4
+bbox1:  dc.w    0
+        ds.w    maxobj*4
+
+; movem predecrement masks for the first 0..7 registers of the zeroed
+; set d0,d1,d3,d6,a1,a2,a3,a5 (bit 15 = d0 ... bit 0 = a7)
+emtab:  dc.w    $0000,$8000,$c000,$d000,$d200,$d240,$d260,$d270
+
+; entity pool (e_* offsets), filled from the level table at start
+entpool:
+        ds.b    (nent+1)*e_size
+
+; ------------------------------------------------------------------- level
+; Static entities (spec 6): mesh, flags, x, z, centre height, heading,
+; two reserved words; -1 ends the table. The spawn is (128, 128) looking
+; along +z: an avenue of towers ahead (x -256 and 512, every 768 in z),
+; blocks on the flanks, mines down the middle at hover height, and a
+; few towers beside and behind the spawn for turning.
+level:
+        dc.w    msh_tower,1,-256,768,yb_tower,0,0,0
+        dc.w    msh_tower,1,512,768,yb_tower,0,0,0
+        dc.w    msh_tower,1,-256,1536,yb_tower,21<<8,0,0
+        dc.w    msh_tower,1,512,1536,yb_tower,21<<8,0,0
+        dc.w    msh_tower,1,-256,2304,yb_tower,0,0,0
+        dc.w    msh_tower,1,512,2304,yb_tower,0,0,0
+        dc.w    msh_tower,1,-256,3072,yb_tower,21<<8,0,0
+        dc.w    msh_tower,1,512,3072,yb_tower,21<<8,0,0
+        dc.w    msh_tower,1,-256,3840,yb_tower,0,0,0
+        dc.w    msh_tower,1,512,3840,yb_tower,0,0,0
+        dc.w    msh_tower,1,-256,4608,yb_tower,0,0,0
+        dc.w    msh_tower,1,512,4608,yb_tower,0,0,0
+        dc.w    msh_block,1,-768,1152,yb_block,0,0,0
+        dc.w    msh_block,1,1024,1920,yb_block,32<<8,0,0
+        dc.w    msh_block,1,-768,2688,yb_block,32<<8,0,0
+        dc.w    msh_block,1,1024,3456,yb_block,0,0,0
+        dc.w    msh_mine,1,128,1152,cam_h,0,0,0
+        dc.w    msh_mine,1,128,2688,cam_h,0,0,0
+        dc.w    msh_mine,1,128,4224,cam_h,0,0,0
+        dc.w    msh_tower,1,-1280,128,yb_tower,0,0,0
+        dc.w    msh_tower,1,1536,128,yb_tower,0,0,0
+        dc.w    msh_tower,1,128,-1024,yb_tower,0,0,0
+        dc.w    msh_tower,1,-768,-768,yb_tower,0,0,0
+        dc.w    msh_tower,1,1024,-768,yb_tower,0,0,0
+        dc.w    -1
+
+        include "meshes.inc"
         include "sin.inc"
 
         even
