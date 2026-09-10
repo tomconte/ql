@@ -8,7 +8,10 @@ all: $(NAME).qlpak
 sin.inc: ../tools/gensin.py
 	python ../tools/gensin.py > sin.inc
 
-$(NAME)_bin: $(NAME).asm sin.inc ../lib/ipc_sound_takeover.asm ../lib/ipc_keys_takeover.asm ../lib/draw_line_w.asm ../lib/draw_line.asm ../lib/draw_dec.asm
+meshes.inc: ../tools/genmesh.py
+	python ../tools/genmesh.py --game > meshes.inc
+
+$(NAME)_bin: $(NAME).asm sin.inc meshes.inc ../lib/ipc_sound_takeover.asm ../lib/ipc_keys_takeover.asm ../lib/draw_line_w.asm ../lib/draw_line.asm ../lib/draw_dec.asm
 	"$(VASM)" -m68008 -Fbin -Dds_avail=$(DATASPACE) -o $@ $(NAME).asm
 
 $(NAME).qlpak: $(NAME)_bin boot $(NAME).QCF ../tools/mkqlpak.ps1
@@ -26,6 +29,6 @@ runmdv: $(NAME).mdv
 	pwsh -NoProfile -Command "Start-Process -FilePath '$(QEMU)' -ArgumentList '$(NAME)_mdv.QCF'"
 
 clean:
-	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).qlpak, $(NAME).mdv, sin.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).qlpak, $(NAME).mdv, sin.inc, meshes.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
 
 .PHONY: all mdv run runmdv clean
