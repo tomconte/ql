@@ -253,11 +253,14 @@ horizon, which is the reverse indicator.
 
 ### 5.4 Horizon and HUD
 
-- **Horizon**: one full-width red line at row `horizon`, redrawn each
-  frame (one 128-byte fill) because erase boxes may cut it. It never
-  moves: no pitch, no roll. A 16-px gap at the centre frames the aim
-  point. (White until M2; the mine at hover height sits exactly on
-  the line, and white through red read badly.)
+- **Horizon**: optional (`hz_line`, off since 2026-09-10 for the
+  Starglider 1 look: the line ran through every object and the mine
+  sat exactly on it). When on: one full-width red line at row
+  `horizon`, redrawn each frame (one 128-byte fill) because erase
+  boxes may cut it, never moving (no pitch, no roll), with a 16-px gap
+  at the centre framing the aim point. With it off, the damage flash
+  of section 7 needs another carrier (the reticle or the HUD
+  separator).
 - **Aim point**: in a yaw-only world every target at hover height
   projects onto the horizon row whatever its distance, so the sight is
   on the horizon (M1: green ticks around the gap, not a cross on the

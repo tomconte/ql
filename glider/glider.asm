@@ -65,6 +65,9 @@ turn_ramp   equ     8               ; +1/32 brad/beat per beat held
 ; the last play row.
 cam_h       equ     128             ; camera height over the ground
 horizon     equ     80              ; screen row of the horizon
+hz_line     equ     0               ; 1 = draw the horizon line, 0 = none
+                                    ; (Starglider 1 look, 2026-09-10: the
+                                    ; reticle alone marks the aim row)
 xfocal      equ     256             ; sx = 256 + x*xfocal/z: 256 = 90-deg
                                     ; horizontal FOV, 384 = 67 deg
 yfocal      equ     170             ; sy = horizon + y*yfocal/z; keep
@@ -584,16 +587,18 @@ frame_loop:
         endc
         beat_poll
 
-; ----- horizon: full-width red line with a 16-px gap at the centre,
-; every frame (nothing moves it, but erase boxes cut it). Red like the
-; lattice since M2: a white line through the red mine sitting on it
-; (hover height) read badly.
+; ----- horizon (hz_line): full-width red line with a 16-px gap at the
+; centre, every frame (nothing moves it, but erase boxes cut it). Red
+; like the lattice since M2: a white line through the red mine sitting
+; on it (hover height) read badly; off by default since the same day.
+        ifne    hz_line
         lea     horizon*scr_llen(a4),a0
         move.l  #$00ff00ff,d0       ; red plane = the odd bytes
         moveq   #32-1,d1
 .hz:    move.l  d0,(a0)+
         dbf     d1,.hz
         clr.l   horizon*scr_llen+62(a4)         ; gap: x 248..263
+        endc
 
 ; ----- objects: every active entity through the four-level cull (world
 ; box, bounding sphere against the frustum, faces by their planes with
