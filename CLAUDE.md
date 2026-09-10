@@ -120,12 +120,19 @@ format spec in `docs/mdv-format.md`.
   `lib/draw_dec.asm` prints a word as a 6-digit decimal readout
   (3x5 green digits, mode 4 — meters, future score displays); meshes are defined
   and validated in `tools/genmesh.py` (winding-consistent closed
-  solids -> `.inc` tables), sin tables come from `tools/gensin.py`;
+  solids -> `.inc` tables; the default output is the parade's, `--game`
+  emits the game set in world units with per-face planes for the
+  object-space backface test and a 32-byte directory, convex meshes
+  only), sin tables come from `tools/gensin.py`;
   `shapes/` is the reference 3D engine (cull, erase, meters).
   Measurements and method: `docs/vector-perf.md`.
 - `glider/` is the game itself (spec: `docs/engine-spec.md`): the shapes
   takeover/double-buffer/meter scaffold plus keyboard, flight model, red
-  lattice ground, horizon and HUD readouts (M1 flight rig).
+  lattice ground, horizon and HUD readouts (M1 flight rig), then the
+  entity pool, camera transform, four-level culling (world box, sphere
+  vs frustum, face planes with the eye in the mesh frame, edge
+  outcodes), near-plane + 2D clipping and per-object erase boxes (M2).
+  Its meshes are `glider/meshes.inc` from `tools/genmesh.py --game`.
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the

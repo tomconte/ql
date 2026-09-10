@@ -114,8 +114,10 @@ pivoting on the spot.
 
 Frame order in the back buffer `a4`:
 
-1. Erase: every object's bounding box from two frames ago (existing
-   movem clear, per buffer), then the dot list (section 5.3).
+1. Erase: every object's bounding box from two frames ago (a list of
+   up to 16 boxes per buffer; rows cleared by 32-byte movem bursts of
+   eight zeroed registers through a computed jump, plus a remainder
+   burst with a patched mask), then the dot list (section 5.3).
 2. Input, simulation, AI (sections 3, 4, 6, 7).
 3. Camera setup: sin/cos of `head`, lattice basis vectors.
 4. Ground lattice dots.
@@ -123,7 +125,10 @@ Frame order in the back buffer `a4`:
    cull, draw.
 6. Projectiles and effects.
 7. HUD: horizon line, reticle, meters.
-8. VBL wait, flip, beat count.
+8. VBL wait, flip, beat count. The frame bit cannot count two missed
+   edges, so the work polls it at stage boundaries (after the lattice,
+   after each drawn object; every stage is under a beat) and the
+   loop's beats are 1 + the edges consumed, up to 3.
 
 All erases run before any draw, so overlapping boxes cost nothing.
 
@@ -160,7 +165,9 @@ extent follows from the 170 focal. The viewport is shifted: the
 horizon sits at row 80 so the view is two thirds ground, and the
 projection stays linear (no pitch). `znear` for the lattice is derived
 from `cam_h` so the nearest dot lands on the last play row (138 units
-at `cam_h` 128); objects use their own near plane.
+at `cam_h` 128); objects use their own near plane, `znear_o` = 32
+(M2), so a tower drifted past keeps its near edges until the last
+moment.
 
 ### 5.2 Culling and clipping
 
@@ -169,20 +176,37 @@ Four levels, cheapest first:
 - **World range**: an object is active only inside a square of side
   `2*R_active` around the camera (two compares, no multiplies).
 - **Frustum**: on the object centre in camera space with the mesh
-  radius `r`: reject if `zc < znear - r` or `|xc| > zc + r`; the
-  vertical test uses `|yc| > zc*3/4 + r` (approximation of the 170
-  focal against half-height 120).
-- **Backface**: the existing per-face cross-product test and edge
-  masks, unchanged.
-- **Edge clipping** (new): needed because near objects and the
-  carrier overflow the screen and the line drawer has no clipping.
-  Fast path: if all projected vertices fall inside the play area,
-  draw as today. Otherwise per edge: a vertex with `zc < znear` is
-  flagged; both flagged skips the edge, one flagged clips the edge
-  against `z = znear` in camera space (parametric, one divide) before
-  projection; then the 2D segment is clipped to the play rectangle
-  (0..511, 0..239) with outcode tests. Only objects that fail the fast
-  path pay.
+  radius `r`, in forms that never reject a sphere touching the view
+  volume (checked exhaustively in the M2 fixed-point model,
+  2026-09-10): reject if `zc + r < znear_o`, if `|xc| - zc > 1.5r`
+  (the 45-degree side planes need `r*sqrt2`), if `yc - zc > 2r`
+  (below) or `yc + zc/2 + 2r < 0` (above; the shifted viewport's top
+  and bottom slopes are 0.47 and 0.935). The first draft here,
+  `|xc| > zc + r`, rejected visible spheres whose centre sits behind
+  the camera.
+- **Backface**: a plane test in the mesh's own frame (M2), replacing
+  the parade's projected cross product, which needs valid projections
+  for all three vertices and near-clipped vertices have none. genmesh
+  emits per face an outward normal scaled to length 1024 and the plane
+  constant `d = n.v0`; per object the eye is rotated into the mesh
+  frame once (`ex = (zc*sa - xc*ca) >> 8`, `ez = -((zc*ca + xc*sa) >>
+  8)`, `ey = -yc`, 4 multiplies) and a face is visible iff `n.e > d`
+  (3 multiplies, a long compare). Exact whatever the clipping does;
+  the meshes must be convex (genmesh asserts it). Edge masks are
+  unchanged. The model showed the two tests agree on every pose with
+  the whole mesh in front of the near plane.
+- **Edge clipping**: needed because near objects and the carrier
+  overflow the screen and the line drawer has no clipping. Per vertex
+  an outcode (1 left, 2 right, 4 above, 8 below, $10 at or behind
+  `znear_o`); when the OR over the mesh is 0 the edges go straight to
+  `draw_line`. Otherwise per edge: both outcodes ANDed nonzero skips
+  it; a near endpoint is moved along the edge to `z = znear_o`
+  (parametric `t` in 0.15 fixed point: one `divs`, two `muls`; 8.8
+  would jitter by ~13 px at the near plane) and projected; then
+  Cohen-Sutherland against the play rectangle (0..511, 0..239), one
+  `muls` + `divs` per boundary crossed. Integer endpoints displace
+  shallow segments a few pixels along their own direction at a
+  boundary, never off it.
 
 The `SHOW_RADIUS` 84 bound in `tools/genmesh.py` was for the parade's
 fixed-depth projection and stops being a limit once edges are clipped;
@@ -229,10 +253,11 @@ horizon, which is the reverse indicator.
 
 ### 5.4 Horizon and HUD
 
-- **Horizon**: one full-width line at row `horizon`, redrawn each
+- **Horizon**: one full-width red line at row `horizon`, redrawn each
   frame (one 128-byte fill) because erase boxes may cut it. It never
   moves: no pitch, no roll. A 16-px gap at the centre frames the aim
-  point.
+  point. (White until M2; the mine at hover height sits exactly on
+  the line, and white through red read badly.)
 - **Aim point**: in a yaw-only world every target at hover height
   projects onto the horizon row whatever its distance, so the sight is
   on the horizon (M1: green ticks around the gap, not a cross on the
@@ -255,8 +280,8 @@ horizon, which is the reverse indicator.
 
 | Colour | Used for |
 |---|---|
-| white | structures (towers, generators), horizon |
-| red | ground lattice; hostiles: patrols, fighters, mines, their shots, damage flashes |
+| white | structures (towers, generators) |
+| red | ground lattice, horizon (M2: white cut through the mine on it); hostiles: patrols, fighters, mines, their shots, damage flashes |
 | green | HUD, reticle, personnel beacons, the carrier, player shots |
 
 Single-plane colours are slightly cheaper than white per pixel
@@ -268,22 +293,32 @@ green.
 - **World**: a bounded square of `W x W` cells (64 initially) with the
   carrier near one edge. Leaving the square is soft-blocked (velocity
   reflected, warning tone); exact rule open.
-- **Entity record** (16 bytes, pool of 64): type, flags/state, x, z
+- **Entity record** (16 bytes, pool of 64, as built in M2): mesh
+  directory index (-1 ends the pool), flags (0 = inactive), x, z
   (16-bit integer world units, the fractional part only matters for
-  the player), heading, hp, timer, mesh directory index, AI data.
-  Static entities (towers, generators, personnel, carrier parts) come
-  from a level table; dynamic ones (patrols, shots, explosions) are
-  allocated from the pool.
-- **Types and meshes** (`tools/genmesh.py` gains a `ybase`, collision
-  radius and mesh radius per entry in the directory):
-  - tower: existing hexagonal tower, white, obstacle.
+  the player), centre height above the ground (`yb_<mesh>` for
+  standing meshes, `cam_h` for the mine), heading (8.8 brads), two
+  reserved words (hp, timer, AI data for M3). Static entities
+  (towers, generators, personnel, carrier parts) come from a level
+  table copied into the pool at start; dynamic ones (patrols, shots,
+  explosions) are allocated from the pool.
+- **Mesh directory** (`tools/genmesh.py --game`, 32 bytes per mesh):
+  counts, colour, vertex/face/edge/plane table offsets, ybase,
+  bounding radius, collision radius; edge tables index the engine's
+  12-byte vertex scratch records directly. The parade's default
+  output is untouched.
+- **Types and meshes**:
+  - tower: hex prism, vertex radius 48, 384 tall (top 256 above the
+    eye; M2), white, obstacle.
+  - block: 192 cube bunker, top below the eye (M2 scenery), white.
   - shield generator: new low mesh (dome or pyramid on a base), white,
     3 hp, mission target.
   - patrol tank / walker: new low-poly mesh, red, ground AI.
   - fighter: existing `fighter` or `dart`, red, flies at hover height
     so it can be hit from level flight (**decided**: nothing the player
     must shoot leaves hover height).
-  - mine: existing octahedron, red, static hazard.
+  - mine: existing octahedron at hover height, red, static hazard
+    (M2 scenery: it sits on the horizon row at any distance).
   - personnel beacon: small green marker (tetrahedron), pickup.
   - carrier: several white/green meshes on the lattice, landing pad
     marked; the only "large" object.
@@ -375,6 +410,26 @@ Caveat found on the way: the KEYROW read must sit after the work,
 before the VBL wait, or Q-emuLator's frame timing goes erratic
 (CLAUDE.md rule 13).
 
+**Measured, M2 (Q-emuLator, 2026-09-10)**, spawn pose at rest: 9
+objects drawn (6 towers at 640..2176 units, 2 blocks, 1 mine; a near
+tower is ~520 px of edges, a far one ~156) on top of the lattice: 831
+extra beats in 128 loops (6.5 average), idle 602 spins average, 27
+min, 1265 max. The min/max pair says the work sits at a multiple of
+20 ms with +-2 ms of jitter (the KEYROW read on alternate loops: 668
+vs 536 spins), so the loop alternates 7 and 8 beats: **~140 ms of
+work, about 13 ms per object including its erase box**, in line with
+the 1.8x rule applied to the estimates above (the 15 000..25 000 row
+is 50 000..90 000 effective cycles = 7..12 ms). Drawing is right
+(screen readings: no through-edges, clean clipping through towers and
+mines, HUD untouched). Levers, largest first: scene density (the M2
+level shows six towers at once; the game should keep 2..4 in the
+frustum, and a far cull at `z_far` drops the slivers), a far level of
+detail for towers (most objects are far, and their cost is per-vertex
+overhead, not pixels: a 4-vertex silhouette cuts it 3x), the lattice's
+`zfar` (16 ms today), a reciprocal table for the two projection
+divides per vertex (~0.5 ms per object), and a 3-beat design budget
+(60 ms: lattice + HUD + 3..4 objects) instead of the 2-beat one.
+
 Memory: code + tables well under 64 KB; meshes a few KB; two dot lists
 of 128 x 4 bytes; entity pool 64 x 16 bytes; level tables a few KB.
 Meters stay in the build (`no_erase`/`no_draw` style flags) until the
@@ -383,8 +438,9 @@ budget is confirmed on Q-emuLator and one FPGA core.
 ## 10. Build and files
 
 New top-level directory copied from `shapes/` (name to pick with the
-game's title): `<name>.asm`, `meshes.inc` (genmesh with the game
-meshes and the extended directory), `sin.inc`, `boot`, `.QCF`,
+game's title): `<name>.asm`, `meshes.inc` (`tools/genmesh.py --game`:
+world-scale meshes, face planes, extended directory), `sin.inc`,
+`boot`, `.QCF`,
 `Makefile` with `NAME`, `DATASPACE`, `run`, `mdv`, `runmdv` targets.
 Include order: `../lib/ipc_sound_takeover.asm`,
 `../lib/ipc_keys_takeover.asm`, `../lib/draw_line_w.asm`,
@@ -405,6 +461,17 @@ initialise with `lea label(pc)` at runtime.
    lever if playability suffers.
 2. **M2 world**: entity table, camera transform, four-level culling,
    near and 2D clipping, multi-object erase. Drive around towers.
+   **Built 2026-09-10** (`glider/`, meshes rescaled first: tower R48
+   H384, block 192, mine as is): the pipeline of sections 5.1/5.2 as
+   now written, a fixed-point model of every step checked against
+   float references before the assembly, a 24-entity level (tower
+   avenue, flank blocks, centreline mines). **Done the same day**:
+   screen readings clean (no through-edges from any angle, clean
+   near/2D clipping through towers and mines, HUD untouched); the
+   near-plane stretching when flying through a mine is accepted, and
+   the horizon went red because a white line through the red mine
+   sitting on it read badly. Budget: ~13 ms per object (section 9),
+   so the work before M3 is budget, not features.
 3. **M3 combat**: shots, collisions, damage, explosions, patrol AI,
    sound.
 4. **M4 mission**: generators, personnel, carrier, sortie loop, score,
