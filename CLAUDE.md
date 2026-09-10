@@ -85,6 +85,15 @@ format spec in `docs/mdv-format.md`.
     `docs/takeover.md` "Double buffering", issue text in
     `docs/mister-flip-latch-issue.md`.
 
+13. **Q-emuLator couples IPC reads to its frame clock.** A KEYROW read
+    (`kbd_row`) in the middle of a frame's work made 47% of the glider
+    rig's loops spurious 2-beat loops (min idle 1 spin, average work
+    unchanged): the emulated 8049's reply lands on a frame tick and
+    drags the frame across the beat. Read the keyboard after the
+    frame's work and its beat classification, right before the VBL
+    wait, where a stall only eats idle time (`glider/glider.asm`).
+    Real hardware pays ~0.5 ms wherever the read sits.
+
 ## Conventions
 
 - New program = new top-level dir copied from `hello/` (asm + boot + QCF +
@@ -114,6 +123,9 @@ format spec in `docs/mdv-format.md`.
   solids -> `.inc` tables), sin tables come from `tools/gensin.py`;
   `shapes/` is the reference 3D engine (cull, erase, meters).
   Measurements and method: `docs/vector-perf.md`.
+- `glider/` is the game itself (spec: `docs/engine-spec.md`): the shapes
+  takeover/double-buffer/meter scaffold plus keyboard, flight model, red
+  lattice ground, horizon and HUD readouts (M1 flight rig).
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the
@@ -129,6 +141,9 @@ format spec in `docs/mdv-format.md`.
   interrupt masking, VBL polling, mode 4/8 screen memory layouts.
 - `docs/mdv-format.md` — QLay `.mdv` container + QDOS Microdrive
   filesystem: sector/checksum layout, map, directory, sources.
+- `docs/engine-spec.md` — the game engine spec: hovercraft raid on a flat
+  world, tank controls with drift, yaw-only camera, lattice ground,
+  culling/clipping plan, budgets, milestones, open questions.
 - `docs/vector-perf.md` — line-drawing benchmark results (`lines/` rig),
   cycle analysis, optimization roadmap toward wireframe 3D.
 - Background/scene notes live in the Obsidian vault:

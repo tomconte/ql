@@ -92,3 +92,18 @@ Q-emuLator's own packages use.
   hardware or an accurate FPGA clone. Performance conclusions from
   Q-emuLator are therefore approximate; contention-sensitive
   optimizations need real hardware to evaluate.
+
+## IPC reads and frame timing
+
+Measured on the glider rig (2026-09-10): a KEYROW read (`kbd_row`, 16
+IPC bit transactions) at the top of the frame loop turned 47% of the
+loops into spurious 2-beat loops with a minimum idle count of 1 spin,
+while the average work per frame was unchanged (16.3 ms with or
+without the read). The emulated 8049's replies appear to be serviced
+on the emulator's frame clock, so a read can stall until a tick, and
+the frame then misses the beat. Without the read the same loop locked
+at 50 Hz (2 spills in 128). Place IPC reads after the frame's work
+and its beat classification, before the VBL wait: a stall then only
+eats idle time. Real hardware is not expected to behave this way (the
+8049 answers asynchronously, about 0.5 ms per KEYROW); measure there
+before drawing conclusions about the IPC's real cost.

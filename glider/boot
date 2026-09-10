@@ -1,0 +1,3 @@
+100 PRINT "Glider flight rig: Left/Right turn, Up thrust, Down brake then reverse, Enter resets."
+110 PRINT "HUD: speed x10, drift x10, heading; meters: spins/2-beat | buffer 0/1 spins | min/max."
+120 EXEC mdv1_glider_bin
