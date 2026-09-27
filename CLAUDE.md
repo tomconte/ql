@@ -19,6 +19,7 @@ for new programs.
 ```
 make        # in a project dir: assemble + package .qlpak
 make run    # launch Q-emuLator with the package
+make check  # register contracts only (glider/, hello/ and its copies)
 ```
 
 Assemble step is `vasmm68k_mot -m68008 -Fbin -o <name>_bin <name>.asm` —
@@ -64,17 +65,29 @@ wdg_put:
 - **Derive a contract from the code, never from an old comment:** every
   destination register, `(an)+`/`-(an)` side effects, `dbf` counters,
   `exg`, `movem` loads, and the callees' contracts.
-- **Widening a contract means checking every caller in the same
-  change:** grep every reference to the name (calls, tail `bra`s,
-  conditional branches like `beq draw_line_w`), check which registers
-  are live across each site, then that caller's own contract,
-  recursively.
+- **Widening a contract means fixing every caller in the same
+  change.** regcheck (below) reports each call site where a newly
+  trashed register is still live, and each routine whose own contract
+  no longer covers what it calls or tail-branches to (`beq
+  draw_line_w`); `-v` shows what is live after every call.
 - Loops that keep registers live across calls declare them at the top:
   glider's frame loop holds d7 = back buffer index and a4 = back buffer
   base, so nothing it calls may trash them.
 - Local `.label` subroutines are private and exempt. The older rigs
   (`shapes/`, `lines/`, `flip/`, …) predate the rule: add contracts to
   whatever you touch there.
+
+**Enforced by `tools/regcheck.py`**, which `make` runs before vasm in
+`glider/` and `hello/` (so new programs inherit it; `make check` runs
+it alone). It reads the program as vasm does (includes, macros, `rept`,
+`if` blocks, `-D`) and stops the build when a routine or macro changes a
+register its contract doesn't list, when a call or macro use trashes a
+register (or the CCR) that is still live after it — the error names the
+instruction that reads it —, when the stack is unbalanced at an rts, or
+when a `bsr`/`jsr` target or a code macro has no contract. Silence a
+reviewed false positive on the reported line or in the contract block:
+`; regcheck-ok: d6 -- why` (registers, `ccr` or `stack`). Not modelled:
+TRAPs, self-modifying code, values passed through memory.
 
 ## Hard-won rules — do not rediscover these
 

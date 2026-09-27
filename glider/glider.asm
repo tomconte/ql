@@ -40,7 +40,8 @@
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
 ; Code lives in .asm files, everything else (equates, macros, data)
 ; in .inc files. Every routine and macro carries a register contract
-; (In / Out / Trashes above its label, the lists complete: CLAUDE.md).
+; (In / Out / Trashes above its label, the lists complete: CLAUDE.md),
+; checked by tools/regcheck.py before every assembly.
 
         include "equates.inc"
         include "macros.inc"
@@ -120,7 +121,7 @@ main:
 ; Loop-wide registers, live across every stage and every call:
 ;   d7 = back buffer index (0 = screen 0, 1 = screen 1)
 ;   a4 = back buffer base (set from d7 at the top of each loop)
-; No routine called from the loop may trash them (check its Trashes);
+; No routine called from the loop may trash them (regcheck enforces it);
 ; a stage that needs one parks it (the lattice pushes d7). The other
 ; registers carry values only locally: within a stage, plus d5 = held
 ; keys from the input into the flight steps and d6 = extra beats across

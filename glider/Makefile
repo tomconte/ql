@@ -16,8 +16,16 @@ meshes.inc: ../tools/genmesh.py
 # after a clean the wildcard can't see them, and they must be rebuilt.
 SRCS := $(sort $(wildcard *.asm *.inc ../lib/*.asm) sin.inc meshes.inc)
 
-$(NAME)_bin: $(SRCS)
+# Register contracts (CLAUDE.md) are checked before every assembly; a
+# problem stops the build. "make check" runs the check alone.
+REGCHECK := python ../tools/regcheck.py -Dds_avail=$(DATASPACE)
+
+$(NAME)_bin: $(SRCS) ../tools/regcheck.py
+	$(REGCHECK) $(NAME).asm
 	"$(VASM)" -m68008 -Fbin -Dds_avail=$(DATASPACE) -o $@ $(NAME).asm
+
+check: $(SRCS)
+	$(REGCHECK) $(NAME).asm
 
 $(NAME).qlpak: $(NAME)_bin boot $(NAME).QCF ../tools/mkqlpak.ps1
 	pwsh -NoProfile -File ../tools/mkqlpak.ps1 -Name $(NAME) -DataSpace $(DATASPACE)
@@ -36,4 +44,4 @@ runmdv: $(NAME).mdv
 clean:
 	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).qlpak, $(NAME).mdv, sin.inc, meshes.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
 
-.PHONY: all mdv run runmdv clean
+.PHONY: all check mdv run runmdv clean
