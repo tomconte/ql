@@ -1,0 +1,60 @@
+; vars.inc -- glider: variables, per-buffer lists and scratch. They are
+; part of the binary; the big tables live in the dataspace (ds_base,
+; end of glider.asm).
+
+; ---------------------------------------------------------------------- data
+        even
+craft:  ds.b    c_size              ; see the c_* offsets (craft_reset inits)
+kbd_prev:
+        dc.b    0                   ; row-1 bits the last sim step used
+kbd_cur:
+        dc.b    0                   ; row-1 bits from the latest IPC read
+        even
+lat_uz: dc.l    0,0                 ; world z step in camera space, 16.16
+wdg:    ds.b    4*12                ; wedge test records (wdg_put)
+lst_max:
+        dc.l    0                   ; this buffer's dot list limit
+hud_tick:
+        dc.w    0                   ; readout refresh phase
+xbeats: dc.w    0                   ; frame edges consumed during the work
+ocam:   ds.b    16                  ; object-stage camera block (oc_*)
+cur:    ds.b    cu_size             ; current object (cu_*)
+
+headroom:
+        dc.l    0                   ; idle spins in last loop's VBL wait
+        dc.l    0                   ; +4  window: spins accumulator
+        dc.w    0                   ; +8  window: extra beats
+        dc.w    mwin                ; +10 loops left in the window
+        dc.w    0                   ; +12 latched avg spins (meter A)
+        dc.w    0                   ; +14 latched extra beats (meter B)
+        dc.w    1                   ; +16 beats of the last loop (1..3)
+        dc.w    0                   ; +18 frames left to draw the meters
+        dc.l    0                   ; +20 window: spins on buffer-0 loops
+        dc.l    0                   ; +24 window: spins on buffer-1 loops
+        dc.w    $7fff               ; +28 window: min spins
+        dc.w    0                   ; +30 window: max spins
+        dc.w    0,0,0,0             ; +32 latched avg0, avg1, min, max
+
+; per-buffer dot lists: count, then (red byte offset, inverse mask);
+; the scan checks the limit per row, so a row of slack follows
+dots0:  dc.w    0
+        ds.w    (maxdots+2*nwin+1)*2
+dots1:  dc.w    0
+        ds.w    (maxdots+2*nwin+1)*2
+
+; object scratch: transformed vertices, the clip work area, and the
+; per-buffer erase-box lists (count, then maxobj parade-format records)
+vscr:   ds.b    16*12
+cwrk:   ds.b    2*cw_size
+bbox0:  dc.w    0
+        ds.w    maxobj*4
+bbox1:  dc.w    0
+        ds.w    maxobj*4
+
+; movem predecrement masks for the first 0..7 registers of the zeroed
+; set d0,d1,d3,d6,a1,a2,a3,a5 (bit 15 = d0 ... bit 0 = a7)
+emtab:  dc.w    $0000,$8000,$c000,$d000,$d200,$d240,$d260,$d270
+
+; entity pool (e_* offsets), filled from the level table at start
+entpool:
+        ds.b    (nent+1)*e_size

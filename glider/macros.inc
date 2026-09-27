@@ -1,0 +1,69 @@
+; macros.inc -- glider: macros of the frame loop (included after
+; equates.inc, before the first use).
+
+; wbound: narrow the row's cell range [d4,d5] with the half-plane test
+; whose record (DF.l, (2*nwin)*DF.l, DF>>16.w, pad) is at (a0), for
+; f(t) = d0 + t*DF over t = 0..2*nwin; branches to \1 when no cell of
+; the row passes. All/none come exactly from f at both row ends; a
+; crossing is bounded by one divide on the integer parts with a 2-cell
+; margin (error under 1/16 at the |DF>>16| >= 16 threshold; flatter
+; slopes stay unbounded and the per-cell tests sort them out).
+; Trashes d0, d1, d6; advances a0 to the next record.
+wbound  macro
+        move.l  (a0),d1             ; DF
+        bmi.s   .wn\@
+        beq.s   .wz\@
+        tst.l   d0                  ; DF > 0: f rises along the row
+        bge.s   .wx\@               ; f(0) >= 0: all pass
+        move.l  d0,d6
+        add.l   4(a0),d6            ; f(2*nwin)
+        bmi     \1                  ; < 0: none pass
+        move.w  8(a0),d1            ; DF>>16
+        cmp.w   #16,d1
+        blt.s   .wx\@               ; too flat to bound
+        neg.l   d0
+        swap    d0
+        ext.l   d0                  ; -f(0) in units (floor)
+        divs.w  d1,d0               ; crossing t in cells
+        subq.w  #2,d0
+        cmp.w   d0,d4
+        bge.s   .wx\@
+        move.w  d0,d4               ; lo = max(lo, t-2)
+        bra.s   .wx\@
+.wn\@:  tst.l   d0                  ; DF < 0: f falls along the row
+        bmi     \1                  ; f(0) < 0: none pass
+        move.l  d0,d6
+        add.l   4(a0),d6            ; f(2*nwin)
+        bge.s   .wx\@               ; >= 0: all pass
+        move.w  8(a0),d1
+        cmp.w   #-16,d1
+        bgt.s   .wx\@               ; too flat to bound
+        neg.w   d1
+        swap    d0
+        ext.l   d0                  ; f(0) in units (floor)
+        divs.w  d1,d0               ; crossing t in cells
+        addq.w  #2,d0
+        cmp.w   d0,d5
+        ble.s   .wx\@
+        move.w  d0,d5               ; hi = min(hi, t+2)
+        bra.s   .wx\@
+.wz\@:  tst.l   d0                  ; DF = 0: f constant along the row
+        bmi     \1
+.wx\@:  lea     12(a0),a0
+        endm
+
+; beat_poll: consume a frame edge that fired since the last poll and
+; count it in xbeats. The frame bit cannot count two edges, so the work
+; is polled at stage boundaries (after the lattice, after each drawn
+; object; every stage is under a beat) and the loop's beats = 1 + the
+; edges consumed. Register-transparent.
+beat_poll macro
+        btst    #pc__frame,pc_intr
+        beq.s   .bp\@
+        move.b  #1<<pc__frame,pc_intr
+        move.l  a0,-(sp)
+        lea     xbeats(pc),a0
+        addq.w  #1,(a0)
+        move.l  (sp)+,a0
+.bp\@:
+        endm

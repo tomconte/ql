@@ -622,9 +622,13 @@ budget is confirmed on Q-emuLator and one FPGA core.
 ## 10. Build and files
 
 The game lives in `glider/`, copied from `shapes/` (renamed if the
-title calls for it): `glider.asm`, `meshes.inc` (`tools/genmesh.py
---game`: world-scale meshes, face planes, extended directory),
-`sin.inc`, `boot`, `.QCF`,
+title calls for it). `glider.asm` is the manifest of one assembly
+unit (its include order is the memory layout) plus the job header,
+takeover and frame loop; routines live in `flight.asm`,
+`render.asm`, `hud.asm`, and the non-code in `equates.inc` (tuning
+knobs, record offsets), `macros.inc`, `vars.inc`, `level.inc`,
+`meshes.inc` (`tools/genmesh.py --game`: world-scale meshes, face
+planes, extended directory) and `sin.inc`; then `boot`, `.QCF`,
 `Makefile` with `NAME`, `DATASPACE`, `run`, `mdv`, `runmdv` targets.
 Include order: `../lib/ipc_sound_takeover.asm`,
 `../lib/ipc_keys_takeover.asm`, `../lib/draw_line_w.asm`,
@@ -695,7 +699,7 @@ same at any frame rate; no self-modifying code.
 - Setting and title (moon base, ship hull, terraformed planet).
 - `horizon` row, `D`, `cam_h`, `z_far`: M1 picked 80 / 256 / 128 /
   2048 (2026-09-10) after 120 / 512 / 40 / 4096 read as a flat
-  strip; still tunable in `glider/glider.asm`.
+  strip; still tunable in `glider/equates.inc`.
 - Drift constants; turn rate coupled to speed or not.
 - Radar scale: 4096 units over 18 px bunches the nearby blips; if it
   reads badly, a 2048 range with out-of-range generators pinned to

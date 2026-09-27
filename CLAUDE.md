@@ -133,6 +133,9 @@ format spec in `docs/mdv-format.md`.
   vs frustum, face planes with the eye in the mesh frame, edge
   outcodes), near-plane + 2D clipping and per-object erase boxes (M2).
   Its meshes are `glider/meshes.inc` from `tools/genmesh.py --game`.
+  Sources are split by `include`: `glider/glider.asm` is the manifest
+  (file map in its header) plus the frame loop; the tuning knobs are
+  in `glider/equates.inc`.
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the
