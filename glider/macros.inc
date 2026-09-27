@@ -8,7 +8,10 @@
 ; crossing is bounded by one divide on the integer parts with a 2-cell
 ; margin (error under 1/16 at the |DF>>16| >= 16 threshold; flatter
 ; slopes stay unbounded and the per-cell tests sort them out).
-; Trashes d0, d1, d6; advances a0 to the next record.
+; In:      d0.l = f(0) (16.16), d4/d5 = cell range lo/hi, a0 = record
+; Out:     d4/d5 narrowed and a0 = next record (+12); or the branch to
+;          \1, a0 not advanced
+; Trashes: d0, d1, d6
 wbound  macro
         move.l  (a0),d1             ; DF
         bmi.s   .wn\@
@@ -56,7 +59,10 @@ wbound  macro
 ; count it in xbeats. The frame bit cannot count two edges, so the work
 ; is polled at stage boundaries (after the lattice, after each drawn
 ; object; every stage is under a beat) and the loop's beats = 1 + the
-; edges consumed. Register-transparent.
+; edges consumed.
+; In:      none
+; Out:     xbeats + 1 when an edge was pending (and the edge consumed)
+; Trashes: none
 beat_poll macro
         btst    #pc__frame,pc_intr
         beq.s   .bp\@

@@ -34,8 +34,9 @@ k1__down    equ     7
 
 ; ----------------------------------------------------------------------------
 ; kbd_row - read one keyboard matrix row.
-; In:  d0.b = row number 0-7.  Out: d0.b = key bits, 1 = held.
-; Trashes d1/d2.
+; In:      d0.b = row number 0-7
+; Out:     d0.b = key bits, 1 = held (d0.l = 0..255)
+; Trashes: d1, d2
 ; ----------------------------------------------------------------------------
 kbd_row
         move    sr,-(sp)

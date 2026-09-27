@@ -33,14 +33,15 @@ stat_cmd equ    1               ; read status (bit1 = sound playing)
 
 ; ----------------------------------------------------------------------------
 ; snd_beep - start a sound. The 8049 keeps playing it on its own.
-; In:  a3 -> 8-byte parameter block:
-;        +0  pitch1 (already +1)
-;        +1  pitch2 (already +1)
-;        +2  interval low byte    +3  interval high byte
-;        +4  duration low byte    +5  duration high byte
-;        +6  gradient<<4 | wrap
-;        +7  random<<4  | fuzz
-; Trashes d0-d2. Call with a3 pointing at one of your note/effect tables.
+; In:      a3 -> 8-byte parameter block (one of your note/effect tables):
+;            +0  pitch1 (already +1)
+;            +1  pitch2 (already +1)
+;            +2  interval low byte    +3  interval high byte
+;            +4  duration low byte    +5  duration high byte
+;            +6  gradient<<4 | wrap
+;            +7  random<<4  | fuzz
+; Out:     a3 = past the block (+8)
+; Trashes: d0-d2
 ; ----------------------------------------------------------------------------
 snd_beep
         move    sr,-(sp)
@@ -60,6 +61,9 @@ snd_beep
 
 ; ----------------------------------------------------------------------------
 ; snd_kill - stop sound immediately. 4 bit transactions only.
+; In:      none
+; Out:     none
+; Trashes: d0, d1
 ; ----------------------------------------------------------------------------
 snd_kill
         move    sr,-(sp)
@@ -70,9 +74,12 @@ snd_kill
         rts
 
 ; ----------------------------------------------------------------------------
-; snd_stat - read IPC status byte. Returns d0.b, bit1 set = still playing.
-; Costs a full round trip (~12 bit transactions); counting frames against
-; the duration you sent is usually cheaper in a game loop.
+; snd_stat - read the IPC status byte. Costs a full round trip (~12 bit
+; transactions); counting frames against the duration you sent is
+; usually cheaper in a game loop.
+; In:      none
+; Out:     d0.b = status, bit 1 set = sound still playing
+; Trashes: d1, d2
 ; ----------------------------------------------------------------------------
 snd_stat
         move    sr,-(sp)
@@ -84,8 +91,11 @@ snd_stat
         rts
 
 ; ----------------------------------------------------------------------------
-; ipc_rdbyte - read one byte from the IPC, MSB first. Returns d0.b.
-; Interrupts must already be masked. Trashes d1/d2.
+; ipc_rdbyte - read one byte from the IPC, MSB first. Interrupts must
+; already be masked.
+; In:      none
+; Out:     d0.b = the byte (d0.l = 0..255)
+; Trashes: d1, d2
 ; ----------------------------------------------------------------------------
 ipc_rdbyte
         moveq   #0,d0
@@ -100,17 +110,24 @@ ipc_rdbyte
         rts
 
 ; ----------------------------------------------------------------------------
-; ipc_byte - send d0.b to the IPC, MSB first (as two nibbles)
-; ipc_nib  - send low nibble of d0.b to the IPC
-; Interrupts must already be masked. Trashes d0/d1.
-; Bit pattern per JS ROM L02F7C: shift nibble to bits 7..4, OR in bit 3
-; as an end marker, then shift bits out until only the marker is left.
+; ipc_byte - send d0.b to the IPC, MSB first (as two nibbles, the low one
+; by falling into ipc_nib). Interrupts must already be masked.
+; In:      d0.b = the byte
+; Out:     none
+; Trashes: d0, d1
 ; ----------------------------------------------------------------------------
 ipc_byte
         move.b  d0,-(sp)
         lsr.b   #4,d0
         bsr.s   ipc_nib         ; high nibble
         move.b  (sp)+,d0        ; low nibble falls through
+; ipc_nib - send the low nibble of d0.b to the IPC. Interrupts must
+; already be masked. Bit pattern per JS ROM L02F7C: shift nibble to bits
+; 7..4, OR in bit 3 as an end marker, then shift bits out until only the
+; marker is left.
+; In:      d0.b = the nibble (low 4 bits)
+; Out:     none
+; Trashes: d0, d1
 ipc_nib
         lsl.b   #4,d0           ; nibble to bits 7..4 (junk above discarded)
         ori.b   #%00001000,d0   ; end marker in bit 3

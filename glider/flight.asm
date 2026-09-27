@@ -2,8 +2,10 @@
 ; the craft reset. Included by glider.asm.
 
 ; --------------------------------------------------------------- flight step
-; One beat of the section-4 model. In: a0 = craft, a1 = sintab, d5.b =
-; held keys (row-1 bits). Trashes d0-d4; preserves d5-d7, a0-a6.
+; flight_step: one beat of the section-4 model.
+; In:      a0 = craft, a1 = sintab, d5.b = held keys (row-1 bits)
+; Out:     the craft record stepped
+; Trashes: d0-d4
 flight_step:
 ; --- turn: ramp while Left xor Right is held, reset on release
         move.w  c_turn(a0),d0
@@ -138,8 +140,11 @@ flight_step:
         rts
 
 ; -------------------------------------------------------------- craft reset
-; Spawn between four lattice points, looking along +z, at rest.
-; Preserves everything but a0.
+; craft_reset: spawn between four lattice points, looking along +z, at
+; rest.
+; In:      none
+; Out:     a0 = craft, the record reset
+; Trashes: none
 craft_reset:
         lea     craft(pc),a0
         move.l  #(latd/2)<<8,c_px(a0)

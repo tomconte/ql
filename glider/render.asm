@@ -3,8 +3,11 @@
 ; clipping, lattice wedge records. Included by glider.asm.
 
 ; ---------------------------------------------------------- dot list select
-; a1 = the dot list of back buffer d7 (count word, then maxdots records
-; of offset.w, inverse-mask.w). Preserves everything else.
+; dots_sel: the dot list of the back buffer (count word, then maxdots
+; records of offset.w, inverse-mask.w).
+; In:      d7 = back buffer index (0|1)
+; Out:     a1 = its dot list
+; Trashes: none
 dots_sel:
         lea     dots0(pc),a1
         tst.w   d7
@@ -13,8 +16,11 @@ dots_sel:
 .d0:    rts
 
 ; ---------------------------------------------------------- box list select
-; a6 = the erase-box list of back buffer d7 (count word, then maxobj
-; records of miny, nrows, end-of-span offset, L). Preserves the rest.
+; bbox_sel: the erase-box list of the back buffer (count word, then
+; maxobj records of miny, nrows, end-of-span offset, L).
+; In:      d7 = back buffer index (0|1)
+; Out:     a6 = its box list
+; Trashes: none
 bbox_sel:
         lea     bbox0(pc),a6
         tst.w   d7
@@ -23,8 +29,10 @@ bbox_sel:
 .b0:    rts
 
 ; --------------------------------------------------------------- box extend
-; Grow the current object's erase box (cur, a1) by the on-screen
-; segment d0,d1 - d2,d3. Preserves every register.
+; bb_ext: grow the current object's erase box by an on-screen segment.
+; In:      a1 = cur, d0,d1 - d2,d3 = the segment
+; Out:     cur's box (cu_minx..cu_maxy) grown
+; Trashes: none
 bb_ext:
         cmp.w   cu_minx(a1),d0
         bge.s   .x1
@@ -53,9 +61,11 @@ bb_ext:
 .y4:    rts
 
 ; ------------------------------------------------------ project + outcode
-; proj_oc: d0 = x', d1 = y', d2 = z' (> 0) -> d0 = sx, d1 = sy, d3 =
-; outcode (spec 5.1: sx = 256 + x'*256/z', sy = horizon + y'*yfocal/z').
-; outcode: d0 = sx, d1 = sy -> d3. Both trash only d0, d1, d3.
+; proj_oc: project a camera-space point (spec 5.1: sx = 256 +
+; x'*256/z', sy = horizon + y'*yfocal/z'), then fall into outcode.
+; In:      d0.w = x', d1.w = y', d2.w = z' (> 0)
+; Out:     d0.w = sx, d1.w = sy, d3 = outcode
+; Trashes: none
 proj_oc:
         ext.l   d0
         asl.l   #8,d0
@@ -64,6 +74,11 @@ proj_oc:
         muls.w  #yfocal,d1
         divs.w  d2,d1
         add.w   #horizon,d1         ; sy
+; outcode: where a screen point lies: 1 left of the screen, 2 right,
+; 4 above, 8 below the play area (or-ed).
+; In:      d0.w = sx, d1.w = sy
+; Out:     d3 = outcode
+; Trashes: none
 outcode:
         moveq   #0,d3
         tst.w   d0
@@ -81,16 +96,19 @@ outcode:
 .o4:    rts
 
 ; ---------------------------------------------------------------- clip edge
-; In: cwrk holds two vertex records A, B (vs_* layout), not both behind
-; the near plane and not both past the same screen edge. A record with
-; outcode $10 (z' <= znear_o) is moved along the edge to z' = znear_o
-; (parametric, t in 0.15 fixed point: one divs, two muls) and projected;
-; then Cohen-Sutherland against 0..511 x 0..playbot, one muls + divs
-; per boundary crossed (the outside endpoint moves to the boundary of
-; its lowest set bit; every step clears a bit for good, so at most a
-; few rounds -- a guard drops the edge after eight).
-; Out: d0-d3 = x1,y1,x2,y2 on screen and d4 = 1, or d4 = 0 for nothing.
-; Trashes d0-d5, a0, a1.
+; clip_edge: clip one edge for draw_line. A record with outcode $10
+; (z' <= znear_o) is moved along the edge to z' = znear_o (parametric,
+; t in 0.15 fixed point: one divs, two muls) and projected; then
+; Cohen-Sutherland against 0..511 x 0..playbot, one muls + divs per
+; boundary crossed (the outside endpoint moves to one boundary it is
+; past: top, bottom, left, right in that order; every step clears a
+; bit for good, so at most a few rounds -- a guard drops the edge
+; after eight).
+; In:      cwrk = two vertex records A, B (vs_* layout), not both behind
+;          the near plane and not both past the same screen edge
+; Out:     d4 = 1 and d0-d3 = x1,y1,x2,y2 on screen; or d4 = 0, nothing
+;          to draw
+; Trashes: d5, a0, a1, cwrk
 clip_edge:
         lea     cwrk(pc),a0
         lea     cw_size(a0),a1
@@ -196,8 +214,11 @@ clip_edge:
         rts
 
 ; ------------------------------------------------------------- wedge record
-; d0.w = w (trig sum, 8.8), a0 -> 12-byte record: DF = w*latd (16.16),
-; (2*nwin)*DF, DF>>16. Trashes d0, d1, d4; advances a0.
+; wdg_put: one wedge test record for wbound (12 bytes): DF = w*latd
+; (16.16), (2*nwin)*DF, DF>>16, pad.
+; In:      d0.w = w (trig sum, 8.8), a0 = record
+; Out:     a0 = next record (+12)
+; Trashes: d0, d1, d4
 wdg_put:
         move.w  d0,d1
         muls.w  #latd,d1            ; w*latd: units per cell, 8.8

@@ -35,6 +35,47 @@ dataspace). The `.mdv` boots in Q-emuLator (`make runmdv`,
 vDriveQL. `python tools/mkmdv.py --verify <image>` checks any image;
 format spec in `docs/mdv-format.md`.
 
+## Register contracts — mandatory
+
+A register clobbered by a callee is the worst bug to chase here: no
+debugger or memory protection after the takeover, and the damage shows
+up far from the cause — in a caller in another file, often only on a
+rarely-taken path. So every routine entered by `bsr`/`jsr` or a tail
+branch, every fall-through entry (`outcode`, `ipc_nib`) and every macro
+carries a contract right above its label:
+
+```
+; wdg_put: one wedge test record for wbound (12 bytes) ...
+; In:      d0.w = w (trig sum, 8.8), a0 = record
+; Out:     a0 = next record (+12)
+; Trashes: d0, d1, d4
+wdg_put:
+```
+
+- **The lists are complete.** A register not named in Out or Trashes is
+  preserved (a register saved and restored isn't listed). CCR is never
+  preserved unless Out names it. `d0.w` in Out: the whole register
+  changes, the low word is the result. Empty list: `none`.
+- **Transitive:** Trashes covers whatever the callees and tail calls
+  trash unless the routine saves it. Modified inputs go in Out (`a0 =
+  next record`, snd_beep's `a3 = past the block`). Shared memory the
+  routine changes is listed too: in Out when it's a result (bb_ext's
+  `cur` box), in Trashes when it's scratch (clip_edge's `cwrk`).
+- **Derive a contract from the code, never from an old comment:** every
+  destination register, `(an)+`/`-(an)` side effects, `dbf` counters,
+  `exg`, `movem` loads, and the callees' contracts.
+- **Widening a contract means checking every caller in the same
+  change:** grep every reference to the name (calls, tail `bra`s,
+  conditional branches like `beq draw_line_w`), check which registers
+  are live across each site, then that caller's own contract,
+  recursively.
+- Loops that keep registers live across calls declare them at the top:
+  glider's frame loop holds d7 = back buffer index and a4 = back buffer
+  base, so nothing it calls may trash them.
+- Local `.label` subroutines are private and exempt. The older rigs
+  (`shapes/`, `lines/`, `flip/`, …) predate the rule: add contracts to
+  whatever you touch there.
+
 ## Hard-won rules — do not rediscover these
 
 1. **Executables need a dataspace.** A raw `-Fbin` output is not EXECable;
@@ -93,6 +134,11 @@ format spec in `docs/mdv-format.md`.
     frame's work and its beat classification, right before the VBL
     wait, where a stall only eats idle time (`glider/glider.asm`).
     Real hardware pays ~0.5 ms wherever the read sits.
+14. **vasm resolves `include` paths from the working directory** (the
+    project dir, where `make` runs it), not from the including file:
+    `sub/a.asm` including `"b.asm"` fails. Keep a program's files flat
+    in its dir. vasm's `undefined symbol` errors also carry no file or
+    line — grep all of the program's files for the name.
 
 ## Conventions
 
@@ -136,6 +182,19 @@ format spec in `docs/mdv-format.md`.
   Sources are split by `include`: `glider/glider.asm` is the manifest
   (file map in its header) plus the frame loop; the tuning knobs are
   in `glider/equates.inc`.
+- A program that outgrows one file is split with `include` into ONE
+  assembly unit, never separate objects + vlink (a build takes ~40 ms
+  anyway, and branches between objects lose vasm's branch-size
+  optimization). `<name>.asm` is the manifest: file map in its header,
+  the includes, the main loop. Code goes in `.asm`, everything else
+  (equates, macros, data, generated tables) in `.inc`. The include order
+  IS the memory layout: equates and macros before their first use, the
+  job header first, and a label that addresses the dataspace (glider's
+  `ds_base`) last — QDOS appends the dataspace there, so anything
+  included after it is overwritten at startup. The Makefile
+  depends on a wildcard over the sources (`glider/Makefile`), so a new
+  file can't leave a stale binary. A pure move must assemble
+  byte-identical: `cmp` the old and new `<name>_bin`.
 - Jobs start with the standard QDOS job header (`bra.s` + `dc.l 0` +
   `dc.w $4afb` + counted name) and exit via MT.FRJOB.
 - Trap key equates are spelled `io_open`, `sd_clear`, … (underscores; the

@@ -1,10 +1,8 @@
 ; draw_dec -- decimal readout, 3x5 green digits (mode 4)
 ;
 ; Replaces binary cell meters: prints an unsigned word as a 6-digit
-; right-aligned decimal field, leading zeros blanked.
-;   d0.w = value (unsigned, 0..65535)
-;   a0   = screen address of the field's top-left GREEN byte (even)
-;   trashes d0-d4, a0-a3; preserves d5-d7, a4-a6.
+; right-aligned decimal field, leading zeros blanked (contract above
+; the label).
 ;
 ; Layout: 3x5 glyphs at 4-px pitch, two glyph nibbles per green byte --
 ; 3 byte columns (24 px) by 5 rows. Only the green plane is written
@@ -20,6 +18,10 @@
 
 ddc_llen    equ     128             ; bytes per scan line
 
+; In:      d0.w = value (unsigned, 0..65535), a0 = screen address of
+;          the field's top-left GREEN byte (even)
+; Out:     none
+; Trashes: d0-d4, a0-a3
 draw_dec:
         lea     ddc_digs+6(pc),a1
         and.l   #$ffff,d0

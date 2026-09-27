@@ -2,7 +2,7 @@
 ; bar. Included by glider.asm.
 
 ; ---------------------------------------------------------------- HUD readouts
-; Four decimal fields (lib/draw_dec.asm, self-erasing):
+; draw_hud: four decimal fields (lib/draw_dec.asm, self-erasing):
 ;   rows 242-246, green byte 0:  forward speed, tenths of a unit/beat
 ;                 green byte 8:  drift = sideways speed, tenths
 ;                 green byte 16: heading, integer brads 0..255
@@ -10,6 +10,9 @@
 ; The speeds are magnitudes: in reverse the dots flow the other way.
 ; Refreshed every 4th frame (drawn twice, once per buffer): five
 ; draw_dec calls a frame cost ~4 ms, a third of the original budget.
+; In:      a4 = back buffer base
+; Out:     none
+; Trashes: d0-d6, a0-a3
 draw_hud:
         lea     hud_tick(pc),a2
         move.w  (a2),d0
@@ -56,8 +59,8 @@ draw_hud:
         rts
 
 ; ------------------------------------------------------------------- meters
-; Six decimal readouts latched from the mwin-loop window, at green
-; bytes 48, 56, 64 (x 192, 224, 256):
+; draw_meters: six decimal readouts latched from the mwin-loop window,
+; at green bytes 48, 56, 64 (x 192, 224, 256):
 ;   rows 242-246: avg idle spins per loop (1 spin ~ 20 us) | avg spins
 ;                 on buffer-0 loops | min spins in the window
 ;   rows 248-252: extra beats in the window (0 = pure 50 Hz) | avg spins
@@ -65,6 +68,9 @@ draw_hud:
 ; Blank until the first full window has latched; then drawn only in
 ; the two frames after each latch (one per buffer), since the values
 ; change only then.
+; In:      a4 = back buffer base
+; Out:     none
+; Trashes: d0-d4, a0-a3
 draw_meters:
         lea     headroom(pc),a1
         tst.w   18(a1)              ; frames left to draw after a latch
@@ -91,8 +97,12 @@ draw_meters:
 .none:  rts
 
 ; -------------------------------------------------------------- headroom bar
-; 64 groups of 8 px, lit = green byte $ff; the unlit remainder is
-; written black, so the bar self-erases. Long writes: two groups each.
+; draw_hbar: 64 groups of 8 px, lit = green byte $ff; the unlit
+; remainder is written black, so the bar self-erases. Long writes: two
+; groups each.
+; In:      a4 = back buffer base
+; Out:     none
+; Trashes: d0-d4, a0, a1
 draw_hbar:
         lea     headroom(pc),a1
         move.l  (a1),d0

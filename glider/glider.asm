@@ -23,7 +23,8 @@
 ; the job's dataspace at startup -- the first version walked all 361
 ; cells and divided twice per dot, at 20 ms a frame.
 ;
-; Assemble: vasmm68k_mot -m68008 -Fbin -o glider_bin glider.asm
+; Assemble: make (vasmm68k_mot -m68008 -Fbin -Dds_avail=<DATASPACE>
+; -o glider_bin glider.asm)
 ;
 ; Sources: this file is the manifest of one assembly unit, and the
 ; include order below IS the memory layout (flat PC-relative binary):
@@ -38,7 +39,8 @@
 ;   then meshes.inc and sin.inc (generated), the supervisor stack, the
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
 ; Code lives in .asm files, everything else (equates, macros, data)
-; in .inc files.
+; in .inc files. Every routine and macro carries a register contract
+; (In / Out / Trashes above its label, the lists complete: CLAUDE.md).
 
         include "equates.inc"
         include "macros.inc"
@@ -115,6 +117,14 @@ main:
         moveq   #1,d7               ; back buffer index: screen 1
 
 ; ---------------------------------------------------------------- frame loop
+; Loop-wide registers, live across every stage and every call:
+;   d7 = back buffer index (0 = screen 0, 1 = screen 1)
+;   a4 = back buffer base (set from d7 at the top of each loop)
+; No routine called from the loop may trash them (check its Trashes);
+; a stage that needs one parks it (the lattice pushes d7). The other
+; registers carry values only locally: within a stage, plus d5 = held
+; keys from the input into the flight steps and d6 = extra beats across
+; the keyboard read.
 frame_loop:
         lea     scr0,a4             ; a4 = back buffer base
         tst.w   d7

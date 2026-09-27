@@ -10,9 +10,6 @@
 ; No colour masking in the hot loops, so each colour costs what its
 ; drawer costs; the dispatch is ~60 cycles per line.
 ;
-; draw_line: d0 = x1, d1 = y1, d2 = x2, d3 = y2 (words, on-screen,
-;            no clipping), d4.w = colour, a4 = screen base
-;   trashes d0-d5, a0, a1; preserves d6, d7, a2, a3, a4, a5.
 ; Colour codes are the mode 4 pixel bits (G = bit 1, R = bit 0):
 col_red     equ     1
 col_green   equ     2
@@ -21,6 +18,12 @@ col_white   equ     3
 ;
 ; No "end" directive -- meant to be included.
 
+; draw_line: one line in colour d4, no clipping (both ends on screen,
+; 0..511 x 0..255).
+; In:      d0 = x1, d1 = y1, d2 = x2, d3 = y2 (words), d4.w = colour,
+;          a4 = screen base
+; Out:     none
+; Trashes: d0-d5, a0, a1
 draw_line:
         cmp.w   #col_white,d4
         beq     draw_line_w         ; white: both planes, tail call
@@ -34,8 +37,6 @@ draw_line:
 
 ; ----------------------------------------------------------------------
 ; draw_line_p -- single-plane drawer: draw_line_w with byte ops.
-;   d0 = x1, d1 = y1, d2 = x2, d3 = y2, a4 = PLANE base (screen base for
-;   green, screen base + 1 for red); trashes d0-d5, a0, a1.
 ; Same dispatch, loops and pixel placement as draw_line_w; every mask is
 ; the single-byte form ($80, $ff, $7f, ...) and the x step is ror.b --
 ; $01 rotates to $80 with carry, advancing to the next screen word (+2 =
@@ -43,6 +44,11 @@ draw_line:
 
 dlp_llen    equ     128             ; bytes per scan line
 
+; In:      d0 = x1, d1 = y1, d2 = x2, d3 = y2 (words, on screen),
+;          a4 = PLANE base (screen base for green, screen base + 1 for
+;          red)
+; Out:     none
+; Trashes: d0-d5, a0, a1
 draw_line_p:
         sub.w   d0,d2               ; d2 = dx
         sub.w   d1,d3               ; d3 = dy

@@ -2,11 +2,9 @@
 ;
 ; The lines/ benchmark drawer (lines/lines.asm round 2) adapted for use
 ; as a library routine:
-;   - entry in registers, no table pointer, no benchmark accounting:
-;       d0 = x1, d1 = y1, d2 = x2, d3 = y2 (words, on-screen coords --
-;       no clipping: the caller guarantees 0..511 x 0..255)
-;       a4 = screen base
-;     trashes d0-d5, a0, a1; preserves d6, d7, a2, a3, a5.
+;   - entry in registers (the contract above the label), no table
+;     pointer, no benchmark accounting, no clipping: the caller
+;     guarantees 0..511 x 0..255
 ;   - WHITE: every plot is a word op on the even-addressed screen word,
 ;     hitting the green byte (high) and red byte (low) together. All the
 ;     masks are byte-pairs ($8080, $C0C0, ...), and the per-pixel x step
@@ -19,6 +17,10 @@
 
 dlw_llen    equ     128             ; bytes per scan line
 
+; In:      d0 = x1, d1 = y1, d2 = x2, d3 = y2 (words, on screen),
+;          a4 = screen base
+; Out:     none
+; Trashes: d0-d5, a0, a1
 draw_line_w:
         sub.w   d0,d2               ; d2 = dx
         sub.w   d1,d3               ; d3 = dy
