@@ -119,6 +119,27 @@ erase_boxes:
         addq.l  #4,sp
 .noeb:  rts
 
+; ---------------------------------------------------------------- dots open
+; dots_open: start this buffer's dot list for the frame, empty (after
+; the erase stage has used it): dl_base = the list (its count word),
+; dl_next = where the next record goes, dl_end = the limit for all but
+; the radar sweep, whose rad_rx records stay reserved past it. Every
+; appender (lattice, blips, sweep) writes at dl_next and adds its
+; records to the count.
+; In:      d7 = back buffer index
+; Out:     the list emptied, dl_base, dl_next, dl_end
+; Trashes: a0, a1
+dots_open:
+        bsr     dots_sel            ; a1 = the list
+        clr.w   (a1)
+        lea     dl_base(pc),a0
+        move.l  a1,(a0)+
+        addq.l  #2,a1
+        move.l  a1,(a0)+            ; dl_next
+        lea     (dl_recs-rad_rx)*4(a1),a1
+        move.l  a1,(a0)             ; dl_end
+        rts
+
 ; --------------------------------------------------------------- erase dots
 ; erase_dots: clear the dots this buffer held two frames ago (lattice
 ; dots: AND the inverse mask into the recorded byte).

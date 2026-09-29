@@ -7,12 +7,16 @@
 ; eye in the mesh's frame, edges by outcodes), then its vertices into
 ; camera space and on screen, and its edges drawn: straight to
 ; draw_line when every vertex is on screen, else through clip_edge; one
-; erase box per drawn object, and a frame-edge poll after it. Across
-; the stage a5 = entity; draw_line trashes a0/a1, so a1 (cur) is
-; reloaded after every line.
-; In:      d7 = back buffer index, a4 = back buffer base
-; Out:     this buffer's erase-box list rebuilt, ocam (oc_n = objects
-;          drawn), xbeats (frame edges polled)
+; erase box per drawn object, and a frame-edge poll after it. An entity
+; on the radar (od_blip) inside the world box gets its blip from the
+; camera-space centre the culling computes anyway (.blip), whether
+; drawn or not. Across the stage a5 = entity; draw_line trashes a0/a1,
+; so a1 (cur) is reloaded after every line.
+; In:      d7 = back buffer index, a4 = back buffer base, the dot list
+;          open (dots_open)
+; Out:     this buffer's erase-box list rebuilt, the blips appended to
+;          the dot list (dl_next, count), ocam (oc_n = objects drawn),
+;          xbeats (frame edges polled)
 ; Trashes: d0-d6, a0-a3, a5, a6, cur, vscr, cwrk
 objects:
         lea     craft(pc),a0
@@ -70,14 +74,20 @@ objects:
         asr.l   #8,d2               ; zc
         move.w  #cam_h,d3
         sub.w   e_y(a5),d3          ; yc (y down: the eye is above the ground)
-; --- frustum on the bounding sphere. Conservative forms (never reject
-; a sphere touching the view volume, checked in the M2 model): the side
-; planes at 1.5r (> r*sqrt2 for 45-degree planes), the top and bottom
-; planes at 2r against the 0.47/0.935 slopes of the shifted viewport.
         move.w  e_mesh(a5),d0
         lsl.w   #5,d0
         lea     objdir(pc),a0
         adda.w  d0,a0               ; a0 = directory entry
+        ifeq    no_rad
+        tst.w   od_blip(a0)
+        beq.s   .nob
+        bsr     .blip               ; on the radar (keeps d1-d3, a0)
+.nob:
+        endc
+; --- frustum on the bounding sphere. Conservative forms (never reject
+; a sphere touching the view volume, checked in the M2 model): the side
+; planes at 1.5r (> r*sqrt2 for 45-degree planes), the top and bottom
+; planes at 2r against the 0.47/0.935 slopes of the shifted viewport.
         move.w  od_rad(a0),d4       ; r
         move.w  d2,d0
         add.w   d4,d0
@@ -325,3 +335,65 @@ objects:
 .enext: lea     e_size(a5),a5
         bra     .ent
 .edone: rts
+
+; .blip: the radar blip of the entity at camera-space (xc, zc) = (d1,
+; d2), in its mesh's colour (od_blip(a0), 1 red, 2 green, 3 white):
+; centre + (xc/128, -zc/192), a pixel per plane, shown inside the
+; circle (rad_range, the rim table). Dots are appended to the dot list
+; and recorded only where they turned a pixel on (bset tests and sets),
+; so the erase never eats the radar frame. Trashes d0, d4, d5, a1, a2.
+.blip:  move.w  d1,d4
+        asr.w   #rad_xsh,d4         ; ox = xc/128
+        move.w  d4,d0
+        bpl.s   .b1
+        neg.w   d0
+.b1:    cmp.w   #rad_rx,d0
+        bgt.s   .bx2                ; beyond the circle's sides
+        move.w  d2,d5
+        muls.w  #rad_ymul,d5
+        swap    d5                  ; oy = zc/192 (floor)
+        move.b  .rim(pc,d0.w),d0    ; the circle's half-height at |ox|
+        tst.w   d5
+        bpl.s   .b2
+        neg.b   d0
+        cmp.b   d0,d5
+        blt.s   .bx2                ; below the circle
+        bra.s   .b3
+.b2:    cmp.b   d0,d5
+        bgt.s   .bx2                ; above it
+.b3:    add.w   #rad_x,d4           ; x
+        neg.w   d5
+        add.w   #rad_y,d5           ; y
+        lsl.w   #7,d5
+        move.w  d4,d0
+        lsr.w   #3,d0
+        add.w   d0,d5
+        add.w   d0,d5               ; d5 = green byte offset
+        not.w   d4
+        and.w   #7,d4               ; d4 = bit number: 7 - (x & 7)
+        move.l  dl_next(pc),a1
+        btst    #1,od_blip+1(a0)    ; green plane?
+        beq.s   .b4
+        bsr.s   .bdot
+.b4:    btst    #0,od_blip+1(a0)    ; red plane?
+        beq.s   .b5
+        addq.w  #1,d5
+        bsr.s   .bdot
+.b5:    lea     dl_next(pc),a2
+        move.l  a1,(a2)
+.bx2:   rts
+.bdot:  cmpa.l  dl_end(pc),a1
+        bhs.s   .bd                 ; list full
+        bset    d4,(a4,d5.w)
+        bne.s   .bd                 ; on already: not ours to erase
+        move.w  d5,(a1)+            ; record: offset,
+        moveq   #-1,d0
+        bclr    d4,d0
+        move.w  d0,(a1)+            ;   inverse mask
+        move.l  dl_base(pc),a2
+        addq.w  #1,(a2)             ; the count
+.bd:    rts
+; half-height of the radar circle in rows at |ox| = 0..18 px:
+; round(12 * sqrt(1 - (ox/18)^2))
+.rim:   dc.b    12,12,12,12,12,12,11,11,11,10,10,9,9,8,8,7,5,4,0
+        even

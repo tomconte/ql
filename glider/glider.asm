@@ -150,6 +150,7 @@ frame_loop:
         bsr     erase_boxes
         bsr     erase_dots
         bsr     sight_erase         ; when its colour changes this frame
+        bsr     dots_open           ; this frame's dot list, empty
 
 ; ----- input: the row-1 bits read at the end of the previous loop (the
 ; IPC read sits between the work and the VBL wait, see there)
@@ -179,9 +180,6 @@ frame_loop:
 
         ifeq    no_lat
         bsr     lattice             ; ground dots (spec 5.3)
-        else
-        bsr     dots_sel
-        clr.w   (a1)                ; no lattice: the dot list starts empty
         endc
         beat_poll
 
@@ -209,7 +207,8 @@ frame_loop:
 ; line of fire.
         bsr     sight_draw
 
-; ----- top strip: the radar's sweep (its frame is static)
+; ----- top strip: the radar's sweep (its frame is static; the blips
+; come from the object stage)
         ifeq    no_rad
         bsr     radar
         endc

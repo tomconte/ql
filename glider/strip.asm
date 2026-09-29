@@ -162,12 +162,15 @@ radar_tabs:
 
 ; -------------------------------------------------------------------- radar
 ; radar: this frame's sweep, copied from its pixel list (radar_tabs)
-; into the screen and the buffer's dot list, after the lattice's
-; records: the erase stage clears it. The sweep turns once in ~1.4 s,
-; stepped by the previous loop's beats like the flight model; list i
-; covers 4i..4i+3 brads.
-; In:      d7 = back buffer index, a4 = back buffer base
-; Out:     this buffer's dot list extended, sweep advanced
+; into the screen and the buffer's dot list, in the room dots_open
+; keeps for it past dl_end: the erase stage clears it. The blips come
+; from the object stage (objects, .blip). The sweep turns once in
+; ~1.4 s, stepped by the previous loop's beats like the flight model;
+; list i covers 4i..4i+3 brads.
+; In:      d7 = back buffer index, a4 = back buffer base, the dot list
+;          open
+; Out:     the sweep appended to the dot list (dl_next, count), sweep
+;          advanced
 ; Trashes: d0-d2, a0, a1
 radar:
         lea     sweep(pc),a0
@@ -181,12 +184,10 @@ radar:
         lea     ds_base(pc),a0
         add.l   d0,a0
         lea     radtab(a0),a0       ; this angle's list
-        bsr     dots_sel            ; a1 = dot list
-        move.w  (a1),d0             ; records so far (the lattice's)
+        move.l  dl_base(pc),a1
         move.w  (a0)+,d1            ; the sweep's pixels: 0 where the
         add.w   d1,(a1)             ; list lies on a wedge line
-        lsl.w   #2,d0
-        lea     2(a1,d0.w),a1       ; a1 = next free record
+        move.l  dl_next(pc),a1
         bra.s   .swe
 .sw:    move.l  (a0)+,d0            ; offset : inverse mask
         move.l  d0,(a1)+            ; the dot record
@@ -195,4 +196,6 @@ radar:
         swap    d0
         or.b    d2,(a4,d0.w)
 .swe:   dbf     d1,.sw
+        lea     dl_next(pc),a0
+        move.l  a1,(a0)
         rts

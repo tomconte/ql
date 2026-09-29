@@ -13,7 +13,13 @@ kbd_cur:
 lat_uz: dc.l    0,0                 ; world z step in camera space, 16.16
 wdg:    ds.b    4*12                ; wedge test records (wdg_put)
 lst_max:
-        dc.l    0                   ; this buffer's dot list limit
+        dc.l    0                   ; the lattice's dot limit
+dl_base:
+        dc.l    0                   ; this frame's dot list (dots_open):
+dl_next:
+        dc.l    0                   ;   its count word, the next record,
+dl_end:
+        dc.l    0                   ;   the limit before the sweep's room
 hud_tick:
         dc.w    0                   ; readout refresh phase
 xbeats: dc.w    0                   ; frame edges consumed during the work

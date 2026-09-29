@@ -9,8 +9,9 @@
 ; (-nwin*latd - rx, -nwin*latd - rz) relative to the camera, rx/rz the
 ; camera's offset within its cell. Camera transform (spec 5.1):
 ;   xc = dx*c - dz*s,  zc = dz*c + dx*s      (8.8 trig, 256 = 1.0)
-; In:      d7 = back buffer index, a4 = back buffer base
-; Out:     this buffer's dot list rebuilt
+; In:      d7 = back buffer index, a4 = back buffer base, the dot list
+;          open (dots_open)
+; Out:     the dots appended to the dot list (dl_next, count)
 ; Trashes: d0-d6, a0-a3, a5, a6, lat_uz, wdg, lst_max
 lattice:
         lea     craft(pc),a0
@@ -53,11 +54,10 @@ lattice:
         move.l  d5,(a0)
         move.l  d5,d2               ; ux (one world x step) = (latd*c, latd*s)
         move.l  d4,d3
-        bsr     dots_sel            ; a1 = dot list (count word first)
-        lea     2+maxdots*4(a1),a0
+        move.l  dl_next(pc),a1      ; a1 = first record
+        lea     maxdots*4(a1),a0
         lea     lst_max(pc),a6
         move.l  a0,(a6)             ; row-granular overflow check below
-        addq.l  #2,a1               ; a1 = first record
         lea     ds_base(pc),a5      ; a5 = rowoff table
         lea     invtab(a5),a6       ; a6 = reciprocal table
 ; wedge prep: each of the four half-plane tests f = a*x + b*z + c >= 0
@@ -162,12 +162,13 @@ lattice:
         subq.w  #1,d7
         bne     .lrow
 .ldone: move.l  (sp)+,d7
-        move.l  a1,d0               ; store the count for the erase
-        bsr     dots_sel
-        sub.l   a1,d0
-        subq.l  #2,d0
+        lea     dl_next(pc),a0      ; the records into the count
+        move.l  a1,d0
+        sub.l   (a0),d0
         lsr.l   #2,d0
-        move.w  d0,(a1)
+        move.l  a1,(a0)
+        move.l  dl_base(pc),a0
+        add.w   d0,(a0)
         rts
 
 ; ------------------------------------------------------------- wedge record

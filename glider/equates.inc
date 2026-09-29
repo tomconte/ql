@@ -82,12 +82,21 @@ nent        equ     64              ; entity pool
 ; ----- top strip (rows 0..playtop-1, spec 5.4): nothing but the HUD is
 ; drawn there (edges are clipped at playtop). The radar: heading-up,
 ; centre (rad_x, rad_y), radius rad_rx px by rad_ry rows (a circle on a
-; 4:3 screen), range 4096 units (the circle a wrapped sector fits in),
-; the sweep turning once in ~1.4 s.
+; 4:3 screen), the sweep turning once in ~1.4 s. Range rad_range units:
+; 128 units a pixel, 192 a row, so the blips come from the object
+; stage's camera-space centres by a shift and a multiply (the range
+; stays inside the world box, r_active). The spec's 4096 cost ~0.4 ms
+; a blip on the 68008 (a transform for every far entity).
 rad_x       equ     256
 rad_y       equ     13
 rad_rx      equ     18
 rad_ry      equ     12
+rad_xsh     equ     7               ; x: 128 units a pixel
+rad_ymul    equ     65536/192       ; y: (zc*rad_ymul) >> 16 = zc/192
+rad_range   equ     rad_rx<<rad_xsh ; 2304 units
+        if      rad_range>=r_active
+        fail    "the radar's range must stay inside the world box"
+        endc
 rad_sweep   equ     936             ; sweep turn per beat, 8.8 brads
                                     ; (256 brads in 70 beats)
 rad_nang    equ     64              ; sweep pixel lists (4 brads apart)
@@ -106,7 +115,7 @@ no_kbd      equ     0               ; skip the IPC keyboard read
 no_lat      equ     0               ; skip the lattice (erase still runs)
 no_hud      equ     0               ; skip the flight readouts
 no_obj      equ     0               ; skip the objects (box erase still runs)
-no_rad      equ     0               ; skip the radar's sweep
+no_rad      equ     0               ; skip the radar's sweep and blips
 ; test_keys: row-1 bits held down on every loop, for unattended runs
 ; under make shot (qlshot cannot press keys): e.g. 1<<k1__right pivots
 ; the craft so every object sweeps across the screen. 0 in a real build.
