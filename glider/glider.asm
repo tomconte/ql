@@ -32,6 +32,7 @@
 ;   macros.inc   wbound, beat_poll
 ;   this file    job header, takeover, frame loop
 ;   flight.asm   flight_step, craft_reset
+;   combat.asm   the player's shots: step (per beat), draw
 ;   lattice.asm  the lattice stage, wedge records
 ;   objects.asm  the object stage
 ;   render.asm   list selectors, the erase stages, erase-box extend,
@@ -169,13 +170,15 @@ frame_loop:
         bsr     craft_reset         ; Enter: back to the spawn point
 .nrst:
 
-; ----- flight: one beat step per beat of the previous loop (1..3), so
-; thrust/drag/turn stay defined per 20 ms whatever the frame rate
+; ----- simulation: one step per beat of the previous loop (1..3), so
+; everything stays defined per 20 ms whatever the frame rate (spec 2.1):
+; the flight model, then the shots
         move.w  headroom+16(pc),d6
         subq.w  #1,d6
-        lea     craft(pc),a0
+.beat:  lea     craft(pc),a0
         lea     sintab(pc),a1
-.beat:  bsr     flight_step
+        bsr     flight_step
+        bsr     shots_step          ; fire, move, hit (spec 7)
         dbf     d6,.beat
 
         ifeq    no_lat
@@ -199,6 +202,7 @@ frame_loop:
 ; ----- objects: cull, transform, clip, draw, erase boxes (spec 5.2)
         ifeq    no_obj
         bsr     objects
+        bsr     shots_draw          ; needs the object stage's ocam
         endc
 
 ; ----- sight: the four-corner bracket around the aim point (256,
@@ -258,6 +262,7 @@ frame_loop:
         bra     frame_loop
 
         include "flight.asm"
+        include "combat.asm"
         include "lattice.asm"
         include "objects.asm"
         include "render.asm"

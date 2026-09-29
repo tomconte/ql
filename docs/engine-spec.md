@@ -526,6 +526,18 @@ runs once per beat (section 2.1).
   sit on the vanishing point as a single dot. Drawn green, ~0.4 ms
   each (estimate). Each beat, tested against gliders, generators,
   mines and obstacles in range; towers and blocks stop them.
+  Built in M3 (2026-09-29, `combat.asm`): 4 in flight, `fire_cd` 7,
+  `shot_v` 80, `shot_life` 25 (range 2000, inside `zfar`), 64-unit
+  segments (first values). Testing every shot against every nearby
+  entity each beat cost ~8 ms a frame on the 68008, so the static
+  world is cast once per shot at launch (`shot_cast`: the entities
+  inside the world box, taken into the shot's frame, the nearest entry
+  into a collision circle): the hit is then a per-beat countdown, and
+  a target gone meanwhile means a new cast. Gliders will need a
+  per-beat test of their own. Drawn through the lattice's reciprocal
+  table (no divides) only between `znear` and `zfar`, so no clipping:
+  ~1 ms per visible bolt (two projections, a line, an erase box);
+  firing costs ~5 ms a frame with 3-4 bolts on screen.
 - **Aim assist**: dropped with the lock (2026-09-24); it can return in
   M3 if digital aiming proves too coarse.
 - **Enemy shots**: a pool of 4, red, fired along the glider's heading,

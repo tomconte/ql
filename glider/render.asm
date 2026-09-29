@@ -157,6 +157,49 @@ erase_dots:
         dbf     d0,.er
 .noer:  rts
 
+; ------------------------------------------------------------------ box add
+; box_add: an erase box for this buffer's next pass (parade format:
+; miny, nrows, end-of-span offset, L longs per row, in 32-px units) from
+; a drawn extent; notes in sight_hit when the box, widened to its units,
+; overlaps the sight (erasing it will cut the sight: sight_erase). The
+; caller has checked that the list has room (maxobj).
+; In:      d0 = minx, d1 = maxx, d2 = miny, d3 = maxy, d7 = back buffer
+;          index
+; Out:     the box list extended, sight_hit[d7]
+; Trashes: d0-d4, a0, a6
+box_add:
+        cmp.w   #sight_x1|31,d0
+        bgt.s   .nsh
+        cmp.w   #sight_x0&~31,d1
+        blt.s   .nsh
+        cmp.w   #horizon+sight_dy,d2
+        bgt.s   .nsh
+        cmp.w   #horizon-sight_dy,d3
+        blt.s   .nsh
+        lea     sight_hit(pc),a0
+        st      (a0,d7.w)
+.nsh:   bsr     bbox_sel            ; a6 = box list
+        move.w  (a6),d4
+        addq.w  #1,(a6)
+        lsl.w   #3,d4
+        lea     2(a6,d4.w),a0       ; the new record
+        move.w  d2,(a0)+            ; miny
+        sub.w   d2,d3
+        addq.w  #1,d3
+        move.w  d3,(a0)+            ; nrows
+        lsr.w   #5,d0               ; 32-px (8-byte) units
+        lsr.w   #5,d1
+        sub.w   d0,d1               ; units spanned - 1
+        lsl.w   #3,d0               ; byte offset of the first unit
+        add.w   d1,d1
+        addq.w  #2,d1               ; L = 2 longs per unit, <= 32
+        move.w  d1,d4
+        lsl.w   #2,d4               ; 4L bytes per row
+        add.w   d4,d0
+        move.w  d0,(a0)+            ; end-of-span offset
+        move.w  d1,(a0)             ; L
+        rts
+
 ; --------------------------------------------------------------- box extend
 ; bb_ext: grow the current object's erase box by an on-screen segment.
 ; In:      a1 = cur, d0,d1 - d2,d3 = the segment

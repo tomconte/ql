@@ -107,6 +107,21 @@ rad_swmax   equ     (rad_rx+1)/2    ; sweep dots: every other one of <= rad_rx
                                     ; steps (max(|dx|, |dy|), rad_rx >= rad_ry)
 rad_stride  equ     2+rad_swmax*4   ; one list: count, records
 
+; ----- player shots (spec 7): up to nshots in flight, one every fire_cd
+; beats while Space is held, shot_v units a beat for shot_life beats
+; (range 2000, inside zfar), launched alternately from the gun ports
+; gun_dx either side of the eye and gun_dy below it, drawn as shot_len-
+; unit green segments. First values (2026-09-29), to be tuned by feel.
+nshots      equ     4
+fire_cd     equ     7
+shot_v      equ     80
+shot_life   equ     25
+shot_len    equ     64
+gun_dx      equ     44
+gun_dy      equ     48
+shot_ym     equ     gun_dy*yfocal*16/xfocal ; sy = horizon + (invtab*it)>>16
+blink_b     equ     6               ; the sight blinks blink_b beats on, off
+
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255
 hb_y        equ     254             ; bar top line (2 rows tall)
@@ -149,6 +164,21 @@ e_hp        equ     12              ; reserved (M3)
 e_tmr       equ     14              ; reserved (M3)
 e_size      equ     16
 
+; player shot record (shots)
+sh_life     equ     0               ; word, beats left, 0 = free
+sh_x        equ     2               ; word, head, world units (wraps)
+sh_z        equ     4
+sh_vx       equ     6               ; word, units per beat
+sh_vz       equ     8
+sh_s        equ     10              ; word, direction sin, cos (8.8)
+sh_c        equ     12
+sh_tx       equ     14              ; word, head to tail, world units
+sh_tz       equ     16
+sh_hit      equ     18              ; word, the life at which it hits sh_tgt
+                                    ; (shot_cast), 0 = nothing on its path
+sh_tgt      equ     20              ; long, the entity it will hit
+sh_size     equ     24
+
 ; mesh directory entry (objdir in meshes.inc, 32 bytes)
 od_nv       equ     0               ; nvtx-1
 od_nf       equ     2               ; nfaces-1
@@ -162,6 +192,7 @@ od_yb       equ     16              ; ybase
 od_rad      equ     18              ; bounding radius
 od_crad     equ     20              ; collision radius (M3)
 od_blip     equ     22              ; radar blip colour (0 = not shown)
+od_hp       equ     24              ; hits to destroy (0 = an obstacle)
 
 ; camera block for the object stage (ocam)
 oc_px       equ     0               ; word, camera x, integer units (0..sector-1)
