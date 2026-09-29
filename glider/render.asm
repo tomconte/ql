@@ -123,7 +123,7 @@ erase_boxes:
 ; dots_open: start this buffer's dot list for the frame, empty (after
 ; the erase stage has used it): dl_base = the list (its count word),
 ; dl_next = where the next record goes, dl_end = the limit for all but
-; the radar sweep, whose rad_rx records stay reserved past it. Every
+; the radar sweep, whose rad_swmax records stay reserved past it. Every
 ; appender (lattice, blips, sweep) writes at dl_next and adds its
 ; records to the count.
 ; In:      d7 = back buffer index
@@ -136,7 +136,7 @@ dots_open:
         move.l  a1,(a0)+
         addq.l  #2,a1
         move.l  a1,(a0)+            ; dl_next
-        lea     (dl_recs-rad_rx)*4(a1),a1
+        lea     (dl_recs-rad_swmax)*4(a1),a1
         move.l  a1,(a0)             ; dl_end
         rts
 

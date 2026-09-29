@@ -82,10 +82,12 @@ radar_frame:
 ; radar_tabs: the sweep's pixel lists, built into the dataspace at start
 ; (radtab: rad_nang lists of rad_stride bytes). List i is the line from
 ; the centre to the rim at 4i brads (0 = straight ahead, clockwise),
-; walked in 8.8 steps of at most one pixel, less the pixels the static
-; frame has on -- tested on screen 0, where radar_frame drew it -- so the
-; sweep never records, and never erases, a frame pixel. Records are the
-; dot list's own: (byte offset, inverse mask), after a count word.
+; walked in 8.8 steps of at most one pixel and dotted: every other
+; pixel, counted back from the rim one (half the sweep's cost, 2026-09-
+; 29). Less the pixels the static frame has on -- tested on screen 0,
+; where radar_frame drew it -- so the sweep never records, and never
+; erases, a frame pixel. Records are the dot list's own: (byte offset,
+; inverse mask), after a count word.
 ; In:      screen 0 holds the radar frame
 ; Out:     radtab built
 ; Trashes: d0-d7, a0-a3
@@ -127,6 +129,8 @@ radar_tabs:
         subq.w  #1,d4
 .px:    add.w   d2,d5
         add.w   d3,d7
+        btst    #0,d4
+        bne.s   .fr                 ; dotted: the rim pixel, then every other
         move.w  d7,d1
         asr.w   #8,d1
         add.w   #rad_y,d1

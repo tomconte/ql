@@ -61,7 +61,7 @@ nwin        equ     zfar/latd+1     ; half-window in cells (+1: the
 maxdots     equ     128             ; lattice dots per buffer (checked per
                                     ; row: a row of slack follows)
 rad_dots    equ     64              ; radar sweep + blip dots per buffer
-                                    ; (the sweep takes up to rad_rx)
+                                    ; (the sweep takes up to rad_swmax)
 dl_recs     equ     maxdots+2*nwin+1+rad_dots   ; dot list records
 
 ; ----- objects (spec sections 5.1, 5.2, 6). The near plane for meshes
@@ -100,8 +100,9 @@ rad_range   equ     rad_rx<<rad_xsh ; 2304 units
 rad_sweep   equ     936             ; sweep turn per beat, 8.8 brads
                                     ; (256 brads in 70 beats)
 rad_nang    equ     64              ; sweep pixel lists (4 brads apart)
-rad_stride  equ     2+rad_rx*4      ; one list: count, <= rad_rx records
-                                    ; (steps = max(|dx|, |dy|), rad_rx >= rad_ry)
+rad_swmax   equ     (rad_rx+1)/2    ; sweep dots: every other one of <= rad_rx
+                                    ; steps (max(|dx|, |dy|), rad_rx >= rad_ry)
+rad_stride  equ     2+rad_swmax*4   ; one list: count, records
 
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255
