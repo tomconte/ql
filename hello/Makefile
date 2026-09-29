@@ -11,7 +11,7 @@ REGCHECK := python ../tools/regcheck.py
 
 $(NAME)_bin: $(NAME).asm ../tools/regcheck.py
 	$(REGCHECK) $(NAME).asm
-	"$(VASM)" -m68008 -Fbin -o $@ $(NAME).asm
+	"$(VASM)" -m68008 -Fbin -L $(NAME).lst -o $@ $(NAME).asm
 
 check: $(NAME).asm
 	$(REGCHECK) $(NAME).asm
@@ -22,7 +22,15 @@ $(NAME).qlpak: $(NAME)_bin boot $(NAME).QCF ../tools/mkqlpak.ps1
 run: $(NAME).qlpak
 	pwsh -NoProfile -Command "Start-Process -FilePath '$(QEMU)' -ArgumentList '$(NAME).qlpak'"
 
-clean:
-	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).qlpak -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+# Look without a human (tools/qlshot.py): relaunch the package, wait
+# SHOTWAIT seconds, write qlshot.png (the displayed screen), print the
+# PEEK specs (labels from $(NAME).lst), close the emulator.
+#   make shot PEEK="label:w label+4:l*2"
+SHOTWAIT ?= 3
+shot: $(NAME).qlpak
+	python ../tools/qlshot.py run $(NAME).qlpak --wait $(SHOTWAIT) --close $(if $(PEEK),--peek $(PEEK))
 
-.PHONY: all check run clean
+clean:
+	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).lst, $(NAME).qlpak, qlshot.png -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+
+.PHONY: all check run shot clean

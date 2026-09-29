@@ -2,6 +2,8 @@
 *_bin
 *.qlpak
 *.mdv
+*.lst
+qlshot.png
 stage/
 
 # stray local files, not part of the project

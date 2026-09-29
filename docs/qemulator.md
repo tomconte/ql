@@ -74,8 +74,14 @@ Q-emuLator's own packages use.
 
 ## Debugging tips
 
-- `qemulator.log` in the install dir is written **on exit** — it lists
-  ROM loads, drivers, and the emulator/QDOS versions of the last session.
+- `qemulator.log` is written **on exit** to
+  `%LOCALAPPDATA%\QemuLator\qemulator.log` (4.0.4; the copy in the
+  install dir is a stale one from an older version). It lists ROM loads,
+  drivers, the emulator/QDOS versions of the last session, and where
+  each job was loaded (`Loaded glider_bin from 3b7e8 to 3ddfc`).
+- To see the screen or read memory without a human, use `tools/qlshot.py`
+  (next section) instead of screen capture: desktop grabs come back black
+  (HDR) and `PrintWindow` white (Direct3D) on this machine.
 - The window title shows the loaded package name (e.g. "hello -
   QemuLator") — a quick check that the qlpak was accepted.
 - A binary that `EXEC`s but crashes immediately usually has a missing or
@@ -92,6 +98,55 @@ Q-emuLator's own packages use.
   hardware or an accurate FPGA clone. Performance conclusions from
   Q-emuLator are therefore approximate; contention-sensitive
   optimizations need real hardware to evaluate.
+
+## Looking inside a running emulator: qlshot
+
+`tools/qlshot.py` reads the emulated QL out of the Q-emuLator process
+(read-only `ReadProcessMemory`, stdlib `ctypes`) and turns it into a PNG
+of the displayed screen or into numbers:
+
+```
+make shot                                  # relaunch, wait 3 s, qlshot.png, close
+make shot SHOTWAIT=14 PEEK="headroom+12:w headroom+32:w*4"
+python ../tools/qlshot.py shot -o x.png    # the emulator already running
+python ../tools/qlshot.py peek kbd_cur:b '$28034:b' 'emtab:w*8'
+python ../tools/qlshot.py info             # block, screen, mode, load address
+python ../tools/qlshot.py close            # WM_CLOSE: clean exit, log written
+```
+
+Peek specs are `EXPR[:SIZE][*COUNT]`: SIZE `b`/`w`/`l` (prefix `s` for
+signed, default `w`), EXPR a label, `$hex`, `0xhex` or decimal with `+`/`-`
+offsets. Labels come from `<name>.lst`, the vasm listing `make` writes
+(`-L`, same binary), and are relocated to where QDOS loaded
+`<name>_bin`. qlshot finds that by searching RAM for the binary's first
+64 bytes and takes the highest hit (a QDOS slave block can cache a copy
+lower down; the job sits above it). An equate prints its value.
+
+What it relies on (found and checked 2026-09-29 on 4.0.4, 32-bit):
+
+- **QL memory is one flat, big-endian block** in the emulator's heap:
+  QL address 0 (the ROM) at the start of a private read-write allocation
+  of RAM top + 4K ($41000 for 128K). It moves on every launch; qlshot
+  finds it by matching the block's first 64 bytes against the ROM images
+  in the install dir's `QL ROMs`. The I/O area is not mirrored in it:
+  `$18063` reads 0 whatever the program writes.
+- **Display state lives in QemuLator.exe's static data** (fixed image
+  base $400000, no ASLR): a long at `$6648D0` holds the QL address of the
+  displayed screen ($20000/$28000; flips every frame under flip8, steady
+  $20000 under QDOS) and a byte at `$671526` is nonzero in mode 8
+  (followed `sv_mcsta` through MODE 8/MODE 4 switches, 56/56 samples).
+  A long at `$671E08` points to the QL memory block; qlshot trusts the
+  other two only when that pointer matches, so a different build falls
+  back to the QDOS sysvars (sv_ident $D254 at $28000: screen 0, mode
+  from sv_mcsta) or, after a takeover, to both screens stacked and
+  `--mode`.
+- **Re-deriving the statics** after an emulator update (`EMU_STATICS` in
+  qlshot.py): snapshot the exe's writable image sections several times
+  under flip8, game8 (mode 8) and flip, hello (mode 4); the mode byte is
+  the one stable within each run that separates the two groups, and the
+  screen long is the one that alternates $20000/$28000 under flip8 but
+  holds $20000 under hello. The memory pointer is the long equal to the
+  block address.
 
 ## IPC reads and frame timing
 

@@ -10,8 +10,8 @@ for new programs.
 - Assembler: `C:\Users\tomco\app\vasm\vasmm68k_mot.exe` (also `vlink.exe`,
   `vobjdump.exe` in the same dir)
 - Emulator: `C:\Program Files (x86)\QemuLator\QemuLator 4\QemuLator.exe`
-  (accepts a `.qlpak` path as argument; logs to `qemulator.log` in its
-  install dir, written on exit)
+  (accepts a `.qlpak` path as argument; logs to
+  `%LOCALAPPDATA%\QemuLator\qemulator.log`, written on exit)
 - Reference QL software/images: `C:\Users\tomco\app\ql\`
 
 ## Build & run
@@ -20,7 +20,21 @@ for new programs.
 make        # in a project dir: assemble + package .qlpak
 make run    # launch Q-emuLator with the package
 make check  # register contracts only (glider/, hello/ and its copies)
+make shot   # relaunch, wait, qlshot.png + PEEK values, close (same dirs)
 ```
+
+**Check a change yourself, don't ask the user to read the screen.**
+`make shot` (optionally `SHOTWAIT=<s>`, `PEEK="label:w label+4:l*2"`)
+runs `tools/qlshot.py`, which reads the emulated QL straight out of the
+Q-emuLator process: then Read `qlshot.png` (the displayed screen, pixel-
+exact, mode 4/8 decoded, 512×512). Prefer peeking a meter's variable
+over reading its digits off the image — labels come from the `<name>.lst`
+listing `make` now writes, relocated to the job's load address.
+`qlshot.py shot/peek/info/close` work on an emulator that is already
+running. Keyboard input is not simulated: what you can check is what the
+program does unattended. Internals, and how to re-derive them after an
+emulator update: `docs/qemulator.md` "Looking inside a running
+emulator".
 
 Assemble step is `vasmm68k_mot -m68008 -Fbin -o <name>_bin <name>.asm` —
 flat binary, PC-relative code only (no relocation). The packaging step
@@ -104,7 +118,8 @@ TRAPs, self-modifying code, values passed through memory.
    `inc/mt`), not from memory — several published lists disagree. The
    verified table is in `docs/qdos-programming.md`.
 4. **Q-emuLator locks the `.qlpak` while running.** Close it before
-   `make`, or the packaging step fails.
+   `make`, or the packaging step fails (`python ../tools/qlshot.py
+   close`; `make shot` closes it itself).
 5. **vasm's site is HTTP-only** (`http://sun.hasenbraten.de/vasm/`);
    WebFetch force-upgrades to HTTPS and fails — use `curl.exe` to fetch.
 6. Don't add tools to PATH — the convention in `C:\Users\tomco\app` is

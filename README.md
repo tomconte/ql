@@ -46,6 +46,12 @@ In `hello/` and `glider/`, `make` first checks the register contracts
 (`tools/regcheck.py`) and stops on a problem; `make check` runs the
 check alone. The rules are in [CLAUDE.md](CLAUDE.md).
 
+`make shot` there relaunches the package, waits `SHOTWAIT` seconds
+(default 3), writes the displayed screen to `qlshot.png`, prints any
+`PEEK="label:w ..."` values and closes the emulator — a look at the
+running program without anyone at the keyboard
+([docs/qemulator.md](docs/qemulator.md#looking-inside-a-running-emulator-qlshot)).
+
 ## Layout
 
 ```
@@ -53,7 +59,7 @@ hello/            "Hello, World!" QDOS job — the template for new programs
   hello.asm       68008 source (QDOS job with its own console window)
   boot            SuperBASIC boot file that EXECs the binary (LF endings!)
   hello.QCF       Q-emuLator session config bundled into the package
-  Makefile        all / check / run / clean
+  Makefile        all / check / run / shot / clean
 takeover/         bare-metal demo: seizes the machine from QDOS, bounces a
                   dot on the mode 4 screen with VBL sync (one-way — reset
                   to exit)
@@ -101,6 +107,8 @@ tools/
   genmesh.py      meshes as data, validated (closed, consistent winding)
                   and emitted as vasm include tables
   regcheck.py     register-contract checker, run by make before vasm
+  qlshot.py       screenshots + memory peeks of a running Q-emuLator,
+                  read from the process (make shot)
 docs/             deep dives (see below)
 specs/            specs written before building a tool (mkmdv)
 CLAUDE.md         conventions and hard-won rules (written for Claude Code,
