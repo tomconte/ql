@@ -51,10 +51,6 @@ bbox0:  dc.w    0
 bbox1:  dc.w    0
         ds.w    maxobj*4
 
-; movem predecrement masks for the first 0..7 registers of the zeroed
-; set d0,d1,d3,d6,a1,a2,a3,a5 (bit 15 = d0 ... bit 0 = a7)
-emtab:  dc.w    $0000,$8000,$c000,$d000,$d200,$d240,$d260,$d270
-
 ; entity pool (e_* offsets), filled from the level table at start
 entpool:
         ds.b    (nent+1)*e_size

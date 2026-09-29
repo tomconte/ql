@@ -81,6 +81,10 @@ no_kbd      equ     0               ; skip the IPC keyboard read
 no_lat      equ     0               ; skip the lattice (erase still runs)
 no_hud      equ     0               ; skip the flight readouts
 no_obj      equ     0               ; skip the objects (box erase still runs)
+; test_keys: row-1 bits held down on every loop, for unattended runs
+; under make shot (qlshot cannot press keys): e.g. 1<<k1__right pivots
+; the craft so every object sweeps across the screen. 0 in a real build.
+test_keys   equ     0
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x

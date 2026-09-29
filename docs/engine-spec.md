@@ -71,10 +71,12 @@ Rules that keep the engine speed-independent:
 - **No self-modifying code.** A 68020 or later (Super Gold Card,
   Q40/Q60) caches instructions and does not see data writes to code,
   so a patched instruction can run stale. The erase's remainder burst
-  patches its movem mask per box (`glider.asm`, `.erm`): to be
-  replaced by eight prebuilt variants of the row loop (same speed, no
-  patching) at the next engine pass. Flushing the cache instead is
-  not an option: `movec` does not exist on the 68008.
+  patched its movem mask per box until M3 (2026-09-29): box widths are
+  an even number of longs, so four prebuilt row loops (remainder 0, 2,
+  4, 6 longs) replaced it, picked per box by two bits of the row
+  stride, at the same speed (`erase_boxes` in `render.asm`). Flushing
+  the cache instead is not an option: `movec` does not exist on the
+  68008.
 - **Timing by handshake or VBL only.** The IPC routines wait on the
   8049's busy bit (no calibrated delay loops) and the frame timing
   polls `$18021`, so neither depends on CPU speed. The idle-spin
@@ -189,8 +191,8 @@ Frame order in the back buffer `a4`:
 1. Erase: every object's bounding box from two frames ago (a list of
    up to 16 boxes per buffer; rows cleared by 32-byte movem bursts of
    eight zeroed registers through a computed jump, plus a remainder
-   burst -- today with a patched mask, to become prebuilt variants,
-   section 2.1), then the dot list (section 5.3), which also carries
+   burst from one of four prebuilt row loops, section 2.1), then the
+   dot list (section 5.3), which also carries
    the sparks and the radar's sweep and blips, then the sight if this
    buffer last showed it (section 5.4).
 2. Input, simulation, AI (sections 3, 4, 6, 7), one step per beat.

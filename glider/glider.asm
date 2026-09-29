@@ -150,6 +150,9 @@ frame_loop:
         move.b  (a2),d3             ; previous frame's bits (edge detect)
         move.b  d0,(a2)
         move.b  d0,d5               ; d5 = held keys through the sim
+        ifne    test_keys
+        or.b    #test_keys,d5       ; forced keys (unattended test runs)
+        endc
         not.b   d3
         and.b   d0,d3               ; d3 = newly pressed
         btst    #k1__enter,d3

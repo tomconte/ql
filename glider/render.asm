@@ -31,59 +31,91 @@ bbox_sel:
 ; -------------------------------------------------------------- erase boxes
 ; erase_boxes: clear the object boxes this buffer held two frames ago
 ; (parade format: miny, nrows, end-of-span offset, L longs per row). Per
-; row eight zeroed registers go out in movem bursts of 32 bytes: the full
-; bursts via a computed jump, the remainder through a mask patched per
-; box (emtab); L reaches 32 for a screen-wide object.
+; row eight zeroed registers go out in movem bursts of 32 bytes from the
+; end of the span down: the full bursts via a computed jump, then a
+; remainder burst. L is even (two longs per 32-px unit, up to 32 for a
+; screen-wide object), so the remainder is 0, 2, 4 or 6 longs, and each
+; has its own prebuilt row loop, picked per box by two bits of the row
+; stride. No self-modifying code (spec 2.1): the first version patched
+; the remainder's movem mask per box, which a 68020's instruction cache
+; would not see.
 ; In:      d7 = back buffer index, a4 = back buffer base
 ; Out:     none
 ; Trashes: d0-d6, a0-a3, a5, a6
 erase_boxes:
         bsr     bbox_sel            ; a6 = this buffer's box list
         move.w  (a6)+,d0
-        beq.s   .noeb
+        beq     .noeb
         lsl.w   #3,d0
         lea     (a6,d0.w),a0
         move.l  a0,-(sp)            ; end of the records
-.ebox:  move.w  (a6)+,d1            ; miny
-        move.w  (a6)+,d2            ; nrows
-        move.w  (a6)+,d3            ; end-of-span offset
-        move.w  (a6)+,d4            ; L
-        lsl.w   #7,d1
-        add.w   d3,d1
-        lea     (a4,d1.w),a0        ; end of the first row's span
-        move.w  d4,d5
-        lsr.w   #3,d5               ; full bursts
-        neg.w   d5
-        addq.w  #4,d5
-        lsl.w   #2,d5               ; jump offset: skip 4 - full bursts
-        move.w  d4,d0
-        and.w   #7,d0
-        add.w   d0,d0
-        lea     emtab(pc),a1
-        move.w  (a1,d0.w),d0        ; remainder mask
-        lea     .erm+2(pc),a1
-        move.w  d0,(a1)
-        lsl.w   #2,d4
-        add.w   #scr_llen,d4        ; row stride = 128 + 4L
-        moveq   #0,d0               ; eight zeros for the bursts
-        moveq   #0,d1
-        moveq   #0,d3
+        moveq   #0,d0               ; eight zeros for the bursts, kept
+        moveq   #0,d1               ; across the boxes: the per-box setup
+        moveq   #0,d3               ; uses d2, d4, d5, a0 only
         moveq   #0,d6
         suba.l  a1,a1
         suba.l  a2,a2
         suba.l  a3,a3
         suba.l  a5,a5
-.erow:  jmp     .ej(pc,d5.w)
-.ej:    movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+.ebox:  move.w  (a6)+,d5            ; miny
+        move.w  (a6)+,d2            ; nrows
+        lsl.w   #7,d5
+        add.w   (a6)+,d5            ; + end-of-span offset
+        lea     (a4,d5.w),a0        ; end of the first row's span
+        move.w  (a6)+,d4            ; L
+        move.w  d4,d5
+        lsr.w   #3,d5               ; full bursts
+        neg.w   d5
+        addq.w  #4,d5
+        lsl.w   #2,d5               ; jump offset: skip 4 - full bursts
+        lsl.w   #2,d4
+        add.w   #scr_llen,d4        ; row stride = 128 + 4L: its bits 4
+        btst    #4,d4               ; and 3 are the remainder's 4 and 2
+        bne.s   .r46
+        btst    #3,d4
+        bne.s   .r2
+.r0:    jmp     .ej0(pc,d5.w)       ; remainder 0
+.ej0:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
         movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
         movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
         movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
-.erm:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)   ; mask patched above
         adda.w  d4,a0
         subq.w  #1,d2
-        bne.s   .erow
-        cmpa.l  (sp),a6
-        blo.s   .ebox
+        bne.s   .r0
+        bra.s   .bnext
+.r2:    jmp     .ej2(pc,d5.w)       ; remainder 2
+.ej2:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1,-(a0)
+        adda.w  d4,a0
+        subq.w  #1,d2
+        bne.s   .r2
+        bra.s   .bnext
+.r46:   btst    #3,d4
+        bne.s   .r6
+.r4:    jmp     .ej4(pc,d5.w)       ; remainder 4
+.ej4:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6,-(a0)
+        adda.w  d4,a0
+        subq.w  #1,d2
+        bne.s   .r4
+        bra.s   .bnext
+.r6:    jmp     .ej6(pc,d5.w)       ; remainder 6
+.ej6:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a2,-(a0)
+        adda.w  d4,a0
+        subq.w  #1,d2
+        bne.s   .r6
+.bnext: cmpa.l  (sp),a6
+        blo     .ebox
         addq.l  #4,sp
 .noeb:  rts
 
