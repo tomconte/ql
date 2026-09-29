@@ -102,6 +102,11 @@ GAME_MESHES = [
       [1,4,2],[1,3,4],[1,5,3],[1,2,5]]),
 ]
 
+# Meshes shown on the radar (spec 5.4), their blips in the mesh's own
+# colour: hostiles red, generators white, energy packs green. Obstacles
+# (towers, blocks) are left off.
+GAME_ON_RADAR = {"mine"}
+
 SHOW_RADIUS = 84        # parade: projection-safe bound (Z0=300, focal
                         # 256/170): the cube's 83 is proven on screen (x
                         # 256+-98, y 120+-66, clear of the meter rows at 240)
@@ -263,7 +268,8 @@ def emit_game():
             print(f"        dc.l    {d}")
     print("; directory, 32 bytes per object: nvtx-1, nfaces-1, nedges-1, colour,")
     print("; v/f/e/n offsets from meshes, ybase (centre to lowest point),")
-    print("; mesh radius, collision radius (x/z extent), pad")
+    print("; mesh radius, collision radius (x/z extent), radar blip colour")
+    print("; (0 = not on the radar), pad")
     print(f"nobjs       equ     {len(out_meshes)}")
     for i, m in enumerate(out_meshes):
         print(f"msh_{m[0]:<8}equ     {i}")
@@ -275,7 +281,8 @@ def emit_game():
               f"{COLOURS[colour]}    ; {colour}")
         print(f"        dc.w    m_{name}_v-meshes,m_{name}_f-meshes,"
               f"m_{name}_e-meshes,m_{name}_n-meshes")
-        print(f"        dc.w    {ybase},{radius},{colrad},0")
+        blip = COLOURS[colour] if name in GAME_ON_RADAR else 0
+        print(f"        dc.w    {ybase},{radius},{colrad},{blip}")
         print("        dc.l    0,0")
 
 if "--game" in sys.argv[1:]:

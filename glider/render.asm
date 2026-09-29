@@ -183,7 +183,7 @@ proj_oc:
         divs.w  d2,d1
         add.w   #horizon,d1         ; sy
 ; outcode: where a screen point lies: 1 left of the screen, 2 right,
-; 4 above, 8 below the play area (or-ed).
+; 4 above, 8 below the play area (rows playtop..playbot; or-ed).
 ; In:      d0.w = sx, d1.w = sy
 ; Out:     d3 = outcode
 ; Trashes: none
@@ -195,9 +195,9 @@ outcode:
 .o1:    cmp.w   #511,d0
         ble.s   .o2
         addq.w  #2,d3               ; right
-.o2:    tst.w   d1
-        bpl.s   .o3
-        addq.w  #4,d3               ; above
+.o2:    cmp.w   #playtop,d1
+        bge.s   .o3
+        addq.w  #4,d3               ; above the play area (the top strip)
 .o3:    cmp.w   #playbot,d1
         ble.s   .o4
         addq.w  #8,d3               ; below the play area
@@ -207,7 +207,7 @@ outcode:
 ; clip_edge: clip one edge for draw_line. A record with outcode $10
 ; (z' <= znear_o) is moved along the edge to z' = znear_o (parametric,
 ; t in 0.15 fixed point: one divs, two muls) and projected; then
-; Cohen-Sutherland against 0..511 x 0..playbot, one muls + divs per
+; Cohen-Sutherland against 0..511 x playtop..playbot, one muls + divs per
 ; boundary crossed (the outside endpoint moves to one boundary it is
 ; past: top, bottom, left, right in that order; every step clears a
 ; bit for good, so at most a few rounds -- a guard drops the edge
@@ -276,11 +276,12 @@ clip_edge:
         sub.w   d1,d3               ; dy
         btst    #2,d4
         beq.s   .n4
-        neg.w   d1                  ; top: x += dx*(0 - y1)/dy, y = 0
-        muls.w  d1,d2
+        move.w  #playtop,d5         ; top: x += dx*(playtop - y1)/dy
+        sub.w   d1,d5
+        muls.w  d5,d2
         divs.w  d3,d2
         add.w   d2,d0
-        moveq   #0,d1
+        move.w  #playtop,d1
         bra.s   .put
 .n4:    btst    #3,d4
         beq.s   .n8

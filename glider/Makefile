@@ -1,5 +1,5 @@
 NAME      := glider
-DATASPACE := 8704   # >= ds_size (zfar*4) in glider.asm, plus stack slack
+DATASPACE := 13440  # >= ds_size in glider.asm (12928), plus stack slack
 VASM      := C:/Users/tomco/app/vasm/vasmm68k_mot.exe
 QEMU      := C:/Program Files (x86)/QemuLator/QemuLator 4/QemuLator.exe
 

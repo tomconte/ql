@@ -37,6 +37,7 @@
 ;   render.asm   list selectors, the erase stages, erase-box extend,
 ;                projection, clipping
 ;   hud.asm      readouts, meters, meter window, headroom bar
+;   strip.asm    the sight, the radar (the top strip)
 ;   vars.inc     variables and scratch
 ;   level.inc    static entity table
 ;   then meshes.inc and sin.inc (generated), the supervisor stack, the
@@ -116,6 +117,12 @@ main:
         tst.w   d0
         bpl.s   .lvl                ; copies the -1 terminator too
 
+        lea     scr0,a4             ; the radar's static frame, both buffers
+        bsr     radar_frame
+        lea     scr1,a4
+        bsr     radar_frame
+        bsr     radar_tabs          ; the sweep's pixel lists (screen 0)
+
         bsr     craft_reset         ; spawn in the open field
         move.b  #1<<pc__frame,pc_intr   ; discard any pending frame bit
         moveq   #1,d7               ; back buffer index: screen 1
@@ -142,6 +149,7 @@ frame_loop:
 ; before any draw, so overlapping boxes cost nothing
         bsr     erase_boxes
         bsr     erase_dots
+        bsr     sight_erase         ; when its colour changes this frame
 
 ; ----- input: the row-1 bits read at the end of the previous loop (the
 ; IPC read sits between the work and the VBL wait, see there)
@@ -171,6 +179,9 @@ frame_loop:
 
         ifeq    no_lat
         bsr     lattice             ; ground dots (spec 5.3)
+        else
+        bsr     dots_sel
+        clr.w   (a1)                ; no lattice: the dot list starts empty
         endc
         beat_poll
 
@@ -192,20 +203,16 @@ frame_loop:
         bsr     objects
         endc
 
-; ----- reticle: green gunsight around the aim point (256, horizon).
-; Every target at hover height projects onto the horizon row whatever
-; its distance (yaw-only world), so the sight lives there; the gap in
-; the line and the four ticks keep the two apart.
-        or.b    #$3c,horizon*scr_llen+62(a4)    ; left tick, x 250..253
-        or.b    #$1e,horizon*scr_llen+64(a4)    ; right tick, x 259..262
-        moveq   #4-1,d1
-        lea     (horizon-6)*scr_llen+64(a4),a0  ; upper tick, 4 rows
-        lea     (horizon+3)*scr_llen+64(a4),a1  ; lower tick
-.ret:   or.b    #$80,(a0)
-        or.b    #$80,(a1)
-        lea     scr_llen(a0),a0
-        lea     scr_llen(a1),a1
-        dbf     d1,.ret
+; ----- sight: the four-corner bracket around the aim point (256,
+; horizon), over the objects (spec 5.4). With yaw only, everything dead
+; ahead projects to x = 256 at any range and height: the stalks are the
+; line of fire.
+        bsr     sight_draw
+
+; ----- top strip: the radar's sweep (its frame is static)
+        ifeq    no_rad
+        bsr     radar
+        endc
 
 ; ----- HUD readouts, headroom bar, meters, then VBL sync + flip. The
 ; frame edges consumed during the work (beat_poll at the stage
@@ -256,6 +263,7 @@ frame_loop:
         include "objects.asm"
         include "render.asm"
         include "hud.asm"
+        include "strip.asm"
         include "vars.inc"
         include "level.inc"
 
@@ -284,7 +292,8 @@ sv_stack_top:
 ; (passed in as ds_avail) must cover ds_size.
 rowoff      equ     0               ; word[zfar]: row*128+1 per depth
 invtab      equ     zfar*2          ; word[zfar]: xfocal*4096/depth
-ds_size     equ     zfar*4
+radtab      equ     zfar*4          ; rad_nang sweep lists (radar_tabs)
+ds_size     equ     radtab+rad_nang*rad_stride
         if      ds_size>ds_avail
         fail    "DATASPACE in the Makefile is smaller than ds_size"
         endc

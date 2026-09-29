@@ -51,13 +51,18 @@ xfocal      equ     256             ; sx = 256 + x*xfocal/z: 256 = 90-deg
 yfocal      equ     170             ; sy = horizon + y*yfocal/z; keep
                                     ; yfocal = xfocal*2/3 (mode 4 pixels
                                     ; are 1.5x taller than wide on 4:3)
+playtop     equ     28              ; first play-area row (top strip above)
 playbot     equ     239             ; last play-area row (HUD from 240)
 znear       equ     cam_h*yfocal/(playbot-horizon)+1 ; nearest depth drawn
 zfar        equ     2048            ; farthest: 10 rows under the horizon
 latd        equ     256             ; lattice spacing, MUST be 2^n
 nwin        equ     zfar/latd+1     ; half-window in cells (+1: the
                                     ; in-cell offset eats up to a cell)
-maxdots     equ     128             ; dot list capacity per buffer
+maxdots     equ     128             ; lattice dots per buffer (checked per
+                                    ; row: a row of slack follows)
+rad_dots    equ     64              ; radar sweep + blip dots per buffer
+                                    ; (the sweep takes up to rad_rx)
+dl_recs     equ     maxdots+2*nwin+1+rad_dots   ; dot list records
 
 ; ----- objects (spec sections 5.1, 5.2, 6). The near plane for meshes
 ; is closer than the lattice's: their edges are clipped, the dots are
@@ -68,6 +73,21 @@ znear_o     equ     32              ; object near plane (z' <= it: clipped)
 r_active    equ     2560            ; world box half-side: zfar + radius + slack
 maxobj      equ     16              ; erase boxes per buffer = objects drawn
 nent        equ     64              ; entity pool
+
+; ----- top strip (rows 0..playtop-1, spec 5.4): nothing but the HUD is
+; drawn there (edges are clipped at playtop). The radar: heading-up,
+; centre (rad_x, rad_y), radius rad_rx px by rad_ry rows (a circle on a
+; 4:3 screen), range 4096 units (the circle a wrapped sector fits in),
+; the sweep turning once in ~1.4 s.
+rad_x       equ     256
+rad_y       equ     13
+rad_rx      equ     18
+rad_ry      equ     12
+rad_sweep   equ     936             ; sweep turn per beat, 8.8 brads
+                                    ; (256 brads in 70 beats)
+rad_nang    equ     64              ; sweep pixel lists (4 brads apart)
+rad_stride  equ     2+rad_rx*4      ; one list: count, <= rad_rx records
+                                    ; (steps = max(|dx|, |dy|), rad_rx >= rad_ry)
 
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255
@@ -81,6 +101,7 @@ no_kbd      equ     0               ; skip the IPC keyboard read
 no_lat      equ     0               ; skip the lattice (erase still runs)
 no_hud      equ     0               ; skip the flight readouts
 no_obj      equ     0               ; skip the objects (box erase still runs)
+no_rad      equ     0               ; skip the radar's sweep
 ; test_keys: row-1 bits held down on every loop, for unattended runs
 ; under make shot (qlshot cannot press keys): e.g. 1<<k1__right pivots
 ; the craft so every object sweeps across the screen. 0 in a real build.
@@ -122,6 +143,7 @@ od_n        equ     14              ; face planes
 od_yb       equ     16              ; ybase
 od_rad      equ     18              ; bounding radius
 od_crad     equ     20              ; collision radius (M3)
+od_blip     equ     22              ; radar blip colour (0 = not shown)
 
 ; camera block for the object stage (ocam)
 oc_px       equ     0               ; long, camera x, integer units

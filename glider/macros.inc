@@ -73,3 +73,39 @@ beat_poll macro
         move.l  (sp)+,a0
 .bp\@:
         endm
+
+; sight_ops: the sight's pixels (spec 5.4) through one byte op: \1 = or
+; with \2 = 0 draws them, \1 = and with \2 = $ff clears them (the masks
+; are XORed with \2). The four-corner bracket, 32 px between its legs:
+; bars at rows horizon-11 and horizon+11 from x 240 to 272, 4-row legs
+; at their ends pointing at the horizon, and stalks at x 256 (the line
+; of fire) out to rows horizon-26 and horizon+26.
+; In:      a0 = colour byte base (back buffer base: +0 green, +1 red)
+; Out:     none
+; Trashes: d0, a1
+sight_ops macro
+        lea     (horizon-26)*scr_llen+64(a0),a1
+        moveq   #15-1,d0
+.st\@:  \1.b    #$80^\2,(a1)                ; top stalk: rows -26..-12
+        \1.b    #$80^\2,38*scr_llen(a1)     ; bottom stalk: +12..+26
+        lea     scr_llen(a1),a1
+        dbf     d0,.st\@
+        lea     (horizon-10)*scr_llen+60(a0),a1
+        moveq   #4-1,d0
+.lg\@:  \1.b    #$80^\2,(a1)                ; top legs: rows -10..-7
+        \1.b    #$80^\2,8(a1)
+        \1.b    #$80^\2,17*scr_llen(a1)     ; bottom legs: +7..+10
+        \1.b    #$80^\2,17*scr_llen+8(a1)
+        lea     scr_llen(a1),a1
+        dbf     d0,.lg\@
+        \1.b    #$ff^\2,(horizon-11)*scr_llen+60(a0)    ; top bar, x 240..272
+        \1.b    #$ff^\2,(horizon-11)*scr_llen+62(a0)
+        \1.b    #$ff^\2,(horizon-11)*scr_llen+64(a0)
+        \1.b    #$ff^\2,(horizon-11)*scr_llen+66(a0)
+        \1.b    #$80^\2,(horizon-11)*scr_llen+68(a0)
+        \1.b    #$ff^\2,(horizon+11)*scr_llen+60(a0)    ; bottom bar
+        \1.b    #$ff^\2,(horizon+11)*scr_llen+62(a0)
+        \1.b    #$ff^\2,(horizon+11)*scr_llen+64(a0)
+        \1.b    #$ff^\2,(horizon+11)*scr_llen+66(a0)
+        \1.b    #$80^\2,(horizon+11)*scr_llen+68(a0)
+        endm

@@ -196,7 +196,8 @@ m_mine_n:
         dc.l    28000
 ; directory, 32 bytes per object: nvtx-1, nfaces-1, nedges-1, colour,
 ; v/f/e/n offsets from meshes, ybase (centre to lowest point),
-; mesh radius, collision radius (x/z extent), pad
+; mesh radius, collision radius (x/z extent), radar blip colour
+; (0 = not on the radar), pad
 nobjs       equ     3
 msh_tower   equ     0
 yb_tower    equ     192
@@ -215,5 +216,5 @@ objdir:
         dc.l    0,0
         dc.w    5,7,11,1    ; red
         dc.w    m_mine_v-meshes,m_mine_f-meshes,m_mine_e-meshes,m_mine_n-meshes
-        dc.w    42,70,70,0
+        dc.w    42,70,70,1
         dc.l    0,0

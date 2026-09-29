@@ -18,6 +18,16 @@ hud_tick:
         dc.w    0                   ; readout refresh phase
 xbeats: dc.w    0                   ; frame edges consumed during the work
 ocam:   ds.b    16                  ; object-stage camera block (oc_*)
+sweep:  dc.w    0                   ; radar sweep angle, 8.8 brads
+; sight colours (0 off, 1 red, 2 green): wanted (set by the simulation),
+; this frame's (latched at the erase), shown per buffer. Adjacent: the
+; strip routines reach them from one base.
+sight_col:
+        dc.b    2
+sight_now:
+        dc.b    0
+sight_buf:
+        dc.b    0,0
 cur:    ds.b    cu_size             ; current object (cu_*)
 
 headroom:
@@ -35,12 +45,13 @@ headroom:
         dc.w    0                   ; +30 window: max spins
         dc.w    0,0,0,0             ; +32 latched avg0, avg1, min, max
 
-; per-buffer dot lists: count, then (red byte offset, inverse mask);
-; the scan checks the limit per row, so a row of slack follows
+; per-buffer dot lists: count, then (byte offset, inverse mask) records:
+; the lattice's (maxdots, checked per row, so a row of slack follows),
+; then the radar's (rad_dots)
 dots0:  dc.w    0
-        ds.w    (maxdots+2*nwin+1)*2
+        ds.w    dl_recs*2
 dots1:  dc.w    0
-        ds.w    (maxdots+2*nwin+1)*2
+        ds.w    dl_recs*2
 
 ; object scratch: transformed vertices, the clip work area, and the
 ; per-buffer erase-box lists (count, then maxobj parade-format records)
