@@ -130,3 +130,55 @@ draw_hbar:
 .dt:    dbf     d2,.drk
         dbf     d3,.row             ; 128 bytes written = next line
         rts
+
+; ------------------------------------------------------------- meter window
+; meter_acc: account one loop in the meter window (the headroom block):
+; its idle spins and extra beats, spins per back buffer, min and max;
+; every mwin loops latch the window into the meter fields and have
+; draw_meters draw them into both buffers. Also stores the loop's beats
+; (headroom+16), which the next loop's simulation steps.
+; In:      d0.l = idle spins of the VBL wait, d1.w = extra beats (0..2),
+;          d7 = back buffer index
+; Out:     the headroom block updated
+; Trashes: d0, d1, a2
+meter_acc:
+        lea     headroom(pc),a2
+        move.l  d0,(a2)
+        add.l   d0,4(a2)            ; window accumulators: spins,
+        add.w   d1,8(a2)            ; extra beats,
+        tst.w   d7                  ; spins per back buffer (64 loops
+        bne.s   .b1                 ; each in a window),
+        add.l   d0,20(a2)
+        bra.s   .b2
+.b1:    add.l   d0,24(a2)
+.b2:    cmp.w   28(a2),d0           ; min and max spins
+        bhs.s   .nmin
+        move.w  d0,28(a2)
+.nmin:  cmp.w   30(a2),d0
+        bls.s   .nmax
+        move.w  d0,30(a2)
+.nmax:  addq.w  #1,d1
+        move.w  d1,16(a2)           ; beats for the next sim step
+        subq.w  #1,10(a2)           ; loops left in the window
+        bne.s   .done
+        move.w  #mwin,10(a2)
+        move.l  4(a2),d0            ; latch: avg spins/loop,
+        lsr.l   #mshift,d0
+        move.w  d0,12(a2)
+        move.w  8(a2),14(a2)        ; extra beats of the window,
+        move.l  20(a2),d0           ; avg spins on buffer-0 loops,
+        lsr.l   #mshift-1,d0
+        move.w  d0,32(a2)
+        move.l  24(a2),d0           ; on buffer-1 loops,
+        lsr.l   #mshift-1,d0
+        move.w  d0,34(a2)
+        move.w  28(a2),36(a2)       ; min, max
+        move.w  30(a2),38(a2)
+        move.w  #2,18(a2)           ; draw the meters into both buffers
+        clr.l   4(a2)
+        clr.w   8(a2)
+        clr.l   20(a2)
+        clr.l   24(a2)
+        move.w  #$7fff,28(a2)
+        clr.w   30(a2)
+.done:  rts

@@ -28,6 +28,82 @@ bbox_sel:
         lea     bbox1(pc),a6
 .b0:    rts
 
+; -------------------------------------------------------------- erase boxes
+; erase_boxes: clear the object boxes this buffer held two frames ago
+; (parade format: miny, nrows, end-of-span offset, L longs per row). Per
+; row eight zeroed registers go out in movem bursts of 32 bytes: the full
+; bursts via a computed jump, the remainder through a mask patched per
+; box (emtab); L reaches 32 for a screen-wide object.
+; In:      d7 = back buffer index, a4 = back buffer base
+; Out:     none
+; Trashes: d0-d6, a0-a3, a5, a6
+erase_boxes:
+        bsr     bbox_sel            ; a6 = this buffer's box list
+        move.w  (a6)+,d0
+        beq.s   .noeb
+        lsl.w   #3,d0
+        lea     (a6,d0.w),a0
+        move.l  a0,-(sp)            ; end of the records
+.ebox:  move.w  (a6)+,d1            ; miny
+        move.w  (a6)+,d2            ; nrows
+        move.w  (a6)+,d3            ; end-of-span offset
+        move.w  (a6)+,d4            ; L
+        lsl.w   #7,d1
+        add.w   d3,d1
+        lea     (a4,d1.w),a0        ; end of the first row's span
+        move.w  d4,d5
+        lsr.w   #3,d5               ; full bursts
+        neg.w   d5
+        addq.w  #4,d5
+        lsl.w   #2,d5               ; jump offset: skip 4 - full bursts
+        move.w  d4,d0
+        and.w   #7,d0
+        add.w   d0,d0
+        lea     emtab(pc),a1
+        move.w  (a1,d0.w),d0        ; remainder mask
+        lea     .erm+2(pc),a1
+        move.w  d0,(a1)
+        lsl.w   #2,d4
+        add.w   #scr_llen,d4        ; row stride = 128 + 4L
+        moveq   #0,d0               ; eight zeros for the bursts
+        moveq   #0,d1
+        moveq   #0,d3
+        moveq   #0,d6
+        suba.l  a1,a1
+        suba.l  a2,a2
+        suba.l  a3,a3
+        suba.l  a5,a5
+.erow:  jmp     .ej(pc,d5.w)
+.ej:    movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+        movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)
+.erm:   movem.l d0-d1/d3/d6/a1-a3/a5,-(a0)   ; mask patched above
+        adda.w  d4,a0
+        subq.w  #1,d2
+        bne.s   .erow
+        cmpa.l  (sp),a6
+        blo.s   .ebox
+        addq.l  #4,sp
+.noeb:  rts
+
+; --------------------------------------------------------------- erase dots
+; erase_dots: clear the dots this buffer held two frames ago (lattice
+; dots: AND the inverse mask into the recorded byte).
+; In:      d7 = back buffer index, a4 = back buffer base
+; Out:     none
+; Trashes: d0-d2, a1
+erase_dots:
+        bsr     dots_sel            ; a1 = this buffer's dot list
+        move.w  (a1)+,d0            ; count
+        beq.s   .noer
+        subq.w  #1,d0
+.er:    move.w  (a1)+,d1            ; offset of the red byte
+        move.w  (a1)+,d2            ; inverse mask (low byte)
+        and.b   d2,(a4,d1.w)
+        dbf     d0,.er
+.noer:  rts
+
 ; --------------------------------------------------------------- box extend
 ; bb_ext: grow the current object's erase box by an on-screen segment.
 ; In:      a1 = cur, d0,d1 - d2,d3 = the segment
@@ -211,24 +287,4 @@ clip_edge:
         rts
 .rej:   addq.l  #2,sp
         moveq   #0,d4
-        rts
-
-; ------------------------------------------------------------- wedge record
-; wdg_put: one wedge test record for wbound (12 bytes): DF = w*latd
-; (16.16), (2*nwin)*DF, DF>>16, pad.
-; In:      d0.w = w (trig sum, 8.8), a0 = record
-; Out:     a0 = next record (+12)
-; Trashes: d0, d1, d4
-wdg_put:
-        move.w  d0,d1
-        muls.w  #latd,d1            ; w*latd: units per cell, 8.8
-        move.l  d1,d4
-        asl.l   #8,d4
-        move.l  d4,(a0)+            ; DF, 16.16
-        muls.w  #2*nwin*latd,d0
-        asl.l   #8,d0
-        move.l  d0,(a0)+            ; (2*nwin)*DF: change over a row
-        asr.l   #8,d1
-        move.w  d1,(a0)+            ; DF>>16 (floor)
-        addq.l  #2,a0               ; pad
         rts

@@ -624,8 +624,10 @@ budget is confirmed on Q-emuLator and one FPGA core.
 The game lives in `glider/`, copied from `shapes/` (renamed if the
 title calls for it). `glider.asm` is the manifest of one assembly
 unit (its include order is the memory layout) plus the job header,
-takeover and frame loop; routines live in `flight.asm`,
-`render.asm`, `hud.asm`, and the non-code in `equates.inc` (tuning
+takeover and frame loop; the loop's stages are once-per-frame
+routines (2026-09-29): `lattice.asm`, `objects.asm`, the erase
+stages in `render.asm` with the projection and clipping helpers;
+then `flight.asm`, `hud.asm`, and the non-code in `equates.inc` (tuning
 knobs, record offsets), `macros.inc`, `vars.inc`, `level.inc`,
 `meshes.inc` (`tools/genmesh.py --game`: world-scale meshes, face
 planes, extended directory) and `sin.inc`; then `boot`, `.QCF`,
