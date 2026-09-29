@@ -361,21 +361,34 @@ Elements:
   blinks (6 beats on, 6 off, about 4 Hz) while any player shot is in
   flight, so continuously under autofire, and shows red for 6 beats
   when the craft is hit (the damage flash the horizon line used to
-  carry). Drawn by an unrolled sequence of `or.b` immediates after the
-  objects; the matching `and.b` sequence clears it in the erase stage
-  whenever the buffer last showed it, before anything is drawn under
-  it (~0.4 ms each).
+  carry). Built in M3 (2026-09-29, `strip.asm`): x 240..272 between
+  the legs, stalks at x 256; one macro (`sight_ops`) expands to the
+  `or.b` draw after the objects and the `and.b` clear, which runs in
+  the erase stage only when the buffer shows a different colour than
+  this frame's (the colour is latched there, so the draw matches).
+  Drawing it costs ~0.9 ms a frame (measured; the estimate was 0.4):
+  every frame, since erase boxes cut it. Cheap cut if needed: redraw
+  only when an erase box overlapped it or the colour changed.
 - **Radar** (**decided**), centre of the strip: heading-up, centre
-  `(256, 13)`, radius 18 px by 12 rows, range 4096 units (about a
-  whole sector, section 6; 1 px is ~228 units). Static frame: four
-  compass ticks and the 90-degree view wedge, drawn once. A sweep
-  line turns about every 1.4 s, from a precomputed pixel list per
-  angle (the frame's pixels left out, so erasing the sweep never eats
-  them). Blips: enemy gliders and mines red, generators white, energy
-  packs green; obstacles are not shown. Entities inside the world box
-  already have camera-space x/z from the culling, so their blips cost
-  a shift and a table lookup; far ones are rotated round-robin, two
-  per frame. Sweep and blips go through the dot list. ~1 ms a frame.
+  `(256, 13)`, radius 18 px by 12 rows. Range 2304 units (M3,
+  2026-09-29; the draft had 4096, about a whole sector): 128 units a
+  pixel across, 192 a row down, so the range stays inside the object
+  stage's world box and every blip comes from the camera-space centre
+  the culling computes anyway -- a shift, one multiply, a rim table
+  for the circle. At 4096 each far entity needed its own transform:
+  ~0.4 ms a blip on the 68008 (the draft's round-robin would have left
+  far blips up to ~40 degrees stale while turning). Static frame: four
+  2-px rim ticks and the 90-degree view wedge, drawn once into both
+  buffers. The sweep turns every ~1.4 s (70 beats), from 64 pixel
+  lists built at startup into the dataspace, the frame's pixels left
+  out (tested on screen 0 after drawing the frame), so erasing the
+  sweep never eats them. Blips: enemy gliders and mines red,
+  generators white, energy packs green (the mesh directory's
+  `od_blip`); obstacles are not shown. Sweep and blips go through the
+  dot list, a blip recorded only where `bset` turned its pixel on.
+  Measured ~1.5 ms a frame (sweep ~0.9, 3-4 blips ~0.6); a dotted
+  sweep would halve its share. Out-of-range generators pinned to the
+  rim at their bearing: still open (section 12).
 - **Shield bar**, top left: 8 segments, green, red at 2 or less, the
   spare craft as small icons under it. **Score** (6 digits,
   `draw_dec`) and **generators left** (a crystal icon and the count),
@@ -616,6 +629,19 @@ overhead, not pixels: a 4-vertex silhouette cuts it 3x), the lattice's
 divides per vertex (~0.5 ms per object), and a 3-beat design budget
 (60 ms: lattice + HUD + 3..4 objects) instead of the 2-beat one.
 
+**Measured, M3 groundwork (Q-emuLator, 2026-09-29, `make shot`
+peeks)**. The sparse 40-entity map (commit 2cf78f9) showed 5 objects
+at the spawn and ran 5-beat loops, ~88 ms of work (~14 ms per object
+on top of the lattice). On the wrapping test sector (26 entities, 3
+objects at the spawn), with the stage split, the SMC-free erase, the
+keyboard read every loop (~1.5 ms on Q-emuLator, out of idle time)
+and the top strip, the spawn view runs 3-beat loops at ~296 average
+idle spins (~6 ms spare): the strip costs ~2.4 ms (sight ~0.9, radar
+~1.5). So the 3-beat design budget is reached with three objects in
+view before any glider, shot or spark: the section 9 table's
+per-object figure (half a tower per glider, ~6 ms) and the M2 levers
+decide how many gliders fit.
+
 Memory: code + tables well under 64 KB; meshes a few KB; two dot lists
 of 128 x 4 bytes; entity pool 64 x 16 bytes; level tables a few KB.
 Meters stay in the build (`no_erase`/`no_draw` style flags) until the
@@ -670,7 +696,13 @@ initialise with `lea label(pc)` at runtime. No self-modifying code
    self-modifying code, the wrapping sector -- then shots (per beat,
    gun ports, the sight's blink), collisions, shield and hit flash,
    sparks, enemy gliders and their AI, generators launching them,
-   mines, sound.
+   mines, sound. **Groundwork done 2026-09-29** (branch
+   `m3-groundwork`): the frame loop's stages became routines, the
+   keyboard is read every loop, the erase's movem mask is no longer
+   patched (four prebuilt row loops), the top strip (clip at 28, the
+   sight, the radar at a 2304 range) and the 8192-unit wrapping sector
+   with a test map that fits it; `test_keys` holds keys down for
+   unattended `make shot` runs. Budget in section 9.
 4. **M4 sectors**: level tables (`tools/genlevel.py`), energy packs,
    the warp, three craft and the windshield crack, score, title and
    end screens.
@@ -705,9 +737,9 @@ same at any frame rate; no self-modifying code.
   2048 (2026-09-10) after 120 / 512 / 40 / 4096 read as a flat
   strip; still tunable in `glider/equates.inc`.
 - Drift constants; turn rate coupled to speed or not.
-- Radar scale: 4096 units over 18 px bunches the nearby blips; if it
-  reads badly, a 2048 range with out-of-range generators pinned to
-  the rim at their bearing.
+- Radar scale: 2304 units since M3 (2026-09-29, by the budget,
+  section 5.4); out-of-range generators pinned to the rim at their
+  bearing, or not.
 - Score values, extra craft (at score thresholds or not), the
   difficulty curve per sector.
 - The warp effect's details; what the bottom band becomes (M5).

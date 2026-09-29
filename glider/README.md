@@ -8,9 +8,10 @@ over, double-buffered at the VBL. The design, budgets and milestones
 are in [docs/engine-spec.md](../docs/engine-spec.md).
 
 **Status:** M1 (flight rig) and M2 (world: entities, culling, clipping,
-per-object erase) are done, so you can fly around a static test map of
-towers, blocks and mines. M3 comes next: the top strip with the radar,
-then combat.
+per-object erase) are done, and so is M3's groundwork: you fly around
+a wrapping 8192-unit test sector of towers, blocks and mines, with the
+four-corner sight and a heading-up radar in the top strip. Combat
+comes next: shots, collisions, enemy gliders.
 
 ## Build and run
 
@@ -31,6 +32,9 @@ MiSTer QL core the wireframes flicker; that's a core bug, see
 Arrows: Left/Right turn, Up thrusts, Down brakes, and holding Down at a
 standstill engages reverse. Enter puts the craft back at the spawn
 point.
+
+The strip at the top holds the radar: the view wedge, a sweep, and a
+red blip for every mine within 2304 units.
 
 The band at the bottom shows speed and drift (tenths of a unit per
 beat), heading and the number of objects drawn. The second group of
