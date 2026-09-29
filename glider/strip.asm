@@ -7,18 +7,28 @@
 ; when this frame's differs (off, or the other colour), and latch this
 ; frame's colour: the simulation may change sight_col later in the
 ; loop, and the draw must match what the erase assumed. An unchanged
-; sight stays: drawing it again over itself is harmless.
+; sight stays, and is redrawn (sight_rd) only if something may have cut
+; it: an erase box just cleared that overlapped it (sight_hit, noted by
+; the object stage when it built the box), or, while it is red, the
+; lattice's red dot erase. Objects and dots only OR over it.
 ; In:      d7 = back buffer index, a4 = back buffer base
-; Out:     sight_now = this frame's sight colour
+; Out:     sight_now = this frame's sight colour, sight_rd = redraw it
 ; Trashes: d0, d1, a0, a1
 sight_erase:
         lea     sight_col(pc),a0
         move.b  (a0),d1             ; wanted: 0 off, 1 red, 2 green
         move.b  d1,sight_now-sight_col(a0)
         move.b  sight_buf-sight_col(a0,d7.w),d0 ; what this buffer shows
+        st      sight_rd-sight_col(a0)          ; redraw, unless intact:
         cmp.b   d0,d1
-        beq     .keep
-        tst.b   d0
+        bne.s   .chg
+        cmp.b   #col_red,d1
+        beq     .keep               ; red: the dot erase may have cut it
+        tst.b   sight_hit-sight_col(a0,d7.w)
+        bne     .keep               ; an erase box overlapped it
+        sf      sight_rd-sight_col(a0)          ; intact
+        bra     .keep
+.chg:   tst.b   d0
         beq     .keep               ; shows none
         move.l  a4,a0
         btst    #1,d0
@@ -29,8 +39,8 @@ sight_erase:
 
 ; --------------------------------------------------------------- sight draw
 ; sight_draw: the sight in this frame's colour (sight_now, latched by
-; sight_erase), drawn over the objects, and noted as what this buffer
-; shows.
+; sight_erase), drawn over the objects unless it is intact in this
+; buffer (sight_rd clear), and noted as what this buffer shows.
 ; In:      d7 = back buffer index, a4 = back buffer base
 ; Out:     sight_buf[d7] = sight_now
 ; Trashes: d0, a0, a1
@@ -39,6 +49,8 @@ sight_draw:
         move.b  (a0),d0
         move.b  d0,sight_buf-sight_now(a0,d7.w)
         beq     .off
+        tst.b   sight_rd-sight_now(a0)
+        beq     .off                ; intact since this buffer drew it
         move.l  a4,a0
         btst    #1,d0
         bne.s   .grn

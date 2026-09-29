@@ -26,7 +26,8 @@ xbeats: dc.w    0                   ; frame edges consumed during the work
 ocam:   ds.b    16                  ; object-stage camera block (oc_*)
 sweep:  dc.w    0                   ; radar sweep angle, 8.8 brads
 ; sight colours (0 off, 1 red, 2 green): wanted (set by the simulation),
-; this frame's (latched at the erase), shown per buffer. Adjacent: the
+; this frame's (latched at the erase), shown per buffer; per buffer, its
+; erase boxes overlap the sight; redraw it this frame. Adjacent: the
 ; strip routines reach them from one base.
 sight_col:
         dc.b    2
@@ -34,6 +35,11 @@ sight_now:
         dc.b    0
 sight_buf:
         dc.b    0,0
+sight_hit:
+        dc.b    0,0
+sight_rd:
+        dc.b    0
+        even
 cur:    ds.b    cu_size             ; current object (cu_*)
 
 headroom:

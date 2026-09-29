@@ -87,6 +87,9 @@ nent        equ     64              ; entity pool
 ; stage's camera-space centres by a shift and a multiply (the range
 ; stays inside the world box, r_active). The spec's 4096 cost ~0.4 ms
 ; a blip on the 68008 (a transform for every far entity).
+sight_x0    equ     240             ; the sight's extent (sight_ops):
+sight_x1    equ     272             ; x 240..272, rows horizon +-26
+sight_dy    equ     26
 rad_x       equ     256
 rad_y       equ     13
 rad_rx      equ     18

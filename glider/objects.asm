@@ -14,9 +14,10 @@
 ; so a1 (cur) is reloaded after every line.
 ; In:      d7 = back buffer index, a4 = back buffer base, the dot list
 ;          open (dots_open)
-; Out:     this buffer's erase-box list rebuilt, the blips appended to
-;          the dot list (dl_next, count), ocam (oc_n = objects drawn),
-;          xbeats (frame edges polled)
+; Out:     this buffer's erase-box list rebuilt (sight_hit[d7]: one of
+;          them overlaps the sight), the blips appended to the dot list
+;          (dl_next, count), ocam (oc_n = objects drawn), xbeats (frame
+;          edges polled)
 ; Trashes: d0-d6, a0-a3, a5, a6, cur, vscr, cwrk
 objects:
         lea     craft(pc),a0
@@ -32,6 +33,8 @@ objects:
         clr.w   oc_n(a1)
         bsr     bbox_sel
         clr.w   (a6)                ; this buffer's box list starts empty
+        lea     sight_hit(pc),a0
+        clr.b   (a0,d7.w)           ; and clear of the sight
         lea     entpool(pc),a5
 .ent:   tst.w   e_mesh(a5)
         bmi     .edone              ; end of the pool
@@ -309,7 +312,17 @@ objects:
         bgt     .enext              ; nothing drawn
         move.w  cu_miny(a1),d2
         move.w  cu_maxy(a1),d3
-        bsr     bbox_sel            ; a6 = box list
+        cmp.w   #sight_x1|31,d0     ; the box, widened to its 32-px units,
+        bgt.s   .nsh                ; over the sight? then erasing it will
+        cmp.w   #sight_x0&~31,d1    ; cut the sight (sight_erase)
+        blt.s   .nsh
+        cmp.w   #horizon+sight_dy,d2
+        bgt.s   .nsh
+        cmp.w   #horizon-sight_dy,d3
+        blt.s   .nsh
+        lea     sight_hit(pc),a0
+        st      (a0,d7.w)
+.nsh:   bsr     bbox_sel            ; a6 = box list
         move.w  (a6),d4
         addq.w  #1,(a6)
         lsl.w   #3,d4
