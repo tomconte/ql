@@ -18,11 +18,11 @@ objects:
         lea     craft(pc),a0
         lea     ocam(pc),a1
         move.l  c_px(a0),d0
-        asr.l   #8,d0
-        move.l  d0,oc_px(a1)        ; camera position, integer units
+        lsr.l   #8,d0
+        move.w  d0,oc_px(a1)        ; camera position, integer units
         move.l  c_pz(a0),d0
-        asr.l   #8,d0
-        move.l  d0,oc_pz(a1)
+        lsr.l   #8,d0
+        move.w  d0,oc_pz(a1)
         move.w  c_s(a0),oc_s(a1)
         move.w  c_c(a0),oc_c(a1)
         clr.w   oc_n(a1)
@@ -33,22 +33,26 @@ objects:
         bmi     .edone              ; end of the pool
         tst.w   e_flags(a5)
         beq     .enext              ; inactive
-; --- world box: |dx|, |dz| < r_active, as longs (the lattice is unbounded)
+; --- world box on the nearest image (the sector wraps, spec 6): the
+; 16-bit difference cut to 13 bits and sign-extended, -4096..4095; then
+; |dx|, |dz| < r_active
         move.w  e_x(a5),d0
-        ext.l   d0
-        sub.l   ocam+oc_px(pc),d0   ; dx
-        move.l  d0,d1
+        sub.w   ocam+oc_px(pc),d0
+        lsl.w   #16-sector_sh,d0
+        asr.w   #16-sector_sh,d0    ; dx
+        move.w  d0,d1
         bpl.s   .bx
-        neg.l   d1
-.bx:    cmp.l   #r_active,d1
+        neg.w   d1
+.bx:    cmp.w   #r_active,d1
         bge     .enext
         move.w  e_z(a5),d2
-        ext.l   d2
-        sub.l   ocam+oc_pz(pc),d2   ; dz
-        move.l  d2,d1
+        sub.w   ocam+oc_pz(pc),d2
+        lsl.w   #16-sector_sh,d2
+        asr.w   #16-sector_sh,d2    ; dz
+        move.w  d2,d1
         bpl.s   .bz
-        neg.l   d1
-.bz:    cmp.l   #r_active,d1
+        neg.w   d1
+.bz:    cmp.w   #r_active,d1
         bge     .enext
 ; --- centre into camera space (spec 5.1):
 ;   xc = (dx*c - dz*s) >> 8,  zc = (dz*c + dx*s) >> 8,  yc = cam_h - e_y

@@ -70,6 +70,11 @@ dl_recs     equ     maxdots+2*nwin+1+rad_dots   ; dot list records
 ; frustum and the eye-in-mesh-frame products need that). Meshes,
 ; planes and the directory come from meshes.inc (genmesh --game).
 znear_o     equ     32              ; object near plane (z' <= it: clipped)
+sector_sh   equ     13              ; the sector wraps every 2^13 units
+sector      equ     1<<sector_sh    ; (spec 6: 32 x 32 cells of latd 256)
+        if      sector&(latd-1)
+        fail    "sector must be a multiple of latd: the lattice must tile"
+        endc
 r_active    equ     2560            ; world box half-side: zfar + radius + slack
 maxobj      equ     16              ; erase boxes per buffer = objects drawn
 nent        equ     64              ; entity pool
@@ -108,8 +113,8 @@ no_rad      equ     0               ; skip the radar's sweep
 test_keys   equ     0
 
 ; craft state record offsets
-c_px        equ     0               ; long, 16.8 world x
-c_pz        equ     4               ; long, 16.8 world z
+c_px        equ     0               ; long, 16.8 world x, 0..sector-1
+c_pz        equ     4               ; long, 16.8 world z (both wrapped)
 c_head      equ     8               ; word, 8.8 brads (0 = looking +z)
 c_turn      equ     10              ; word, current turn rate (0 = released)
 c_vx        equ     12              ; word, 8.8 units/beat
@@ -146,11 +151,11 @@ od_crad     equ     20              ; collision radius (M3)
 od_blip     equ     22              ; radar blip colour (0 = not shown)
 
 ; camera block for the object stage (ocam)
-oc_px       equ     0               ; long, camera x, integer units
-oc_pz       equ     4               ; long
-oc_s        equ     8               ; word, sin head
-oc_c        equ     10              ; word, cos head
-oc_n        equ     12              ; word, objects drawn this frame
+oc_px       equ     0               ; word, camera x, integer units (0..sector-1)
+oc_pz       equ     2               ; word
+oc_s        equ     4               ; word, sin head
+oc_c        equ     6               ; word, cos head
+oc_n        equ     8               ; word, objects drawn this frame
 
 ; current object (cur)
 cu_v        equ     0               ; long, vertex table

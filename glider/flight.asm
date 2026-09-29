@@ -132,11 +132,13 @@ flight_step:
         sub.w   d2,d1
         move.w  d1,c_vz(a0)
 .ncap:
-; --- position
+; --- position, wrapped into the sector (spec 6): 0..sector-1, 16.8
         ext.l   d0
         add.l   d0,c_px(a0)
+        andi.l  #(sector<<8)-1,c_px(a0)
         ext.l   d1
         add.l   d1,c_pz(a0)
+        andi.l  #(sector<<8)-1,c_pz(a0)
         rts
 
 ; -------------------------------------------------------------- craft reset
