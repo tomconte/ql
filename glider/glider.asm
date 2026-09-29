@@ -223,17 +223,15 @@ frame_loop:
 ; the frame clock, so a read can stall to a tick and drag the frame
 ; across the beat. Here a stall only eats idle time. On real hardware
 ; the read costs its ~0.5 ms wherever it sits; input latency is the
-; same either way (the next loop uses it). Read on buffer-1 loops
-; only, so the buffer-0 spins stay a pure headroom readout and the
-; buffer-1 spins show the read's cost.
+; same either way (the next loop uses it). Read every loop since M3
+; (2026-09-29): M1/M2 read on buffer-1 loops only, to keep the buffer-0
+; spins a pure headroom readout, but at the 3-beat budget that samples
+; fire and turn every 120 ms.
         ifeq    no_kbd
-        tst.w   d7
-        beq.s   .nokb
         moveq   #key_row1,d0
         bsr     kbd_row             ; d0.b = key bits, 1 = held
         lea     kbd_cur(pc),a2
         move.b  d0,(a2)
-.nokb:
         endc
         move.w  d6,d1
         moveq   #0,d0

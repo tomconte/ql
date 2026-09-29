@@ -65,6 +65,9 @@ draw_hud:
 ;                 on buffer-0 loops | min spins in the window
 ;   rows 248-252: extra beats in the window (0 = pure 50 Hz) | avg spins
 ;                 on buffer-1 loops | max spins in the window
+; Both buffers' loops read the keyboard since M3, so the buffer-0/1
+; pair no longer isolates the read's cost; it still shows a load that
+; differs between the buffers (the refresh phases of draw_hud).
 ; Blank until the first full window has latched; then drawn only in
 ; the two frames after each latch (one per buffer), since the values
 ; change only then.
