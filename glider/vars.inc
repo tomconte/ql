@@ -81,9 +81,14 @@ nlive:  dc.w    0                   ; shots in flight
 fire_t: dc.w    0
 gun_lr: dc.w    0
 ; near: the entities inside the world box (the object stage, each
-; frame), for the shots' hit tests: count, pointers
+; frame), for the shots' hit tests; close: those within r_close, for
+; the craft's; each a count, then pointers
 near:   dc.w    0
         ds.l    nent
+close:  dc.w    0
+        ds.l    nent
+shield: dc.w    shield_max
+hurt_t: dc.w    0                   ; beats since a hit, counting down
 
 ; entity pool (e_* offsets), filled from the level table at start
 entpool:

@@ -1,6 +1,180 @@
-; combat.asm -- glider: the player's shots (spec 7): fired and moved
-; once per beat, their static targets found at launch, drawn once per
-; frame. Included by glider.asm.
+; combat.asm -- glider: combat (spec 7): the craft's collisions and
+; shield, once per beat; the player's shots, fired and moved once per
+; beat, their static targets found at launch, drawn once per frame.
+; Included by glider.asm.
+
+; ---------------------------------------------------------------- craft hit
+; craft_hit: one beat of the craft's collisions (spec 7) with the
+; entities the object stage found close to it (close, the last frame's
+; list: r_close covers two frames of flight): a box reject, then
+; |d|^2 < (od_crad + craft_r)^2. An entity whose mesh has od_touch is
+; consumed and changes the shield by it (a mine: -2). The rest are
+; obstacles: moving into one reflects the velocity about the contact
+; normal and halves it, and undoes the beat's move (so the craft never
+; stays inside). A bump -- at least bump_v along the normal -- costs 1
+; shield unless a hit in the last hurt_b beats already did; leaning on
+; a wall with thrust held costs nothing (it drained 2 a second). A loss
+; turns the sight red for flash_b beats; at zero the craft starts over
+; with a full shield (a stand-in for M4's windshield crack and spare
+; craft). The shield bar is redrawn when the value changed.
+; In:      none
+; Out:     craft (position, velocity; reset at zero shield), shield,
+;          hurt_t, sight_col, the shield bar, entities consumed (e_flags)
+; Trashes: d0-d4, a0-a3, a5, a6
+craft_hit:
+        lea     craft(pc),a0
+; --- the hurt timer: the sight red for its first flash_b beats
+        lea     hurt_t(pc),a1
+        tst.w   (a1)
+        beq.s   .calm
+        subq.w  #1,(a1)
+        cmp.w   #hurt_b-flash_b,(a1)
+        bgt.s   .calm
+        lea     sight_col(pc),a3
+        move.b  #col_green,(a3)
+.calm:
+; --- the close entities
+        lea     close(pc),a2
+        move.w  (a2)+,d0
+        beq     .done               ; nothing near: the usual case
+        move.w  shield(pc),-(sp)    ; to see a change at the end
+        lsl.w   #2,d0
+        lea     (a2,d0.w),a3
+        move.l  a3,-(sp)            ; end of the list
+        move.l  c_px(a0),d0
+        lsr.l   #8,d0
+        move.w  d0,a6               ; a6 = the craft's x
+        move.l  c_pz(a0),d0
+        lsr.l   #8,d0
+        move.w  d0,a1               ; a1 = its z
+.cl:    move.l  (a2)+,a5
+        tst.w   e_flags(a5)
+        beq     .cn                 ; gone
+        move.w  e_mesh(a5),d2
+        lsl.w   #5,d2
+        lea     objdir(pc),a3
+        adda.w  d2,a3               ; a3 = directory entry
+        move.w  od_crad(a3),d2
+        add.w   #craft_r,d2         ; R: the contact distance
+        move.w  e_x(a5),d0
+        sub.w   a6,d0
+        lsl.w   #16-sector_sh,d0
+        asr.w   #16-sector_sh,d0    ; dx = entity - craft (nearest image)
+        move.w  d0,d3
+        bpl.s   .x
+        neg.w   d3
+.x:     cmp.w   d2,d3
+        bge     .cn
+        move.w  e_z(a5),d1
+        sub.w   a1,d1
+        lsl.w   #16-sector_sh,d1
+        asr.w   #16-sector_sh,d1    ; dz
+        move.w  d1,d3
+        bpl.s   .z
+        neg.w   d3
+.z:     cmp.w   d2,d3
+        bge     .cn
+        move.w  d0,d3
+        muls.w  d3,d3
+        move.w  d1,d4
+        muls.w  d4,d4
+        add.l   d4,d3               ; |d|^2
+        mulu.w  d2,d2               ; R^2
+        cmp.l   d2,d3
+        bge     .cn                 ; outside the circle
+; --- contact
+        move.w  od_touch(a3),d2
+        beq.s   .wall
+        clr.w   e_flags(a5)         ; consumed (a mine)
+        bsr     .shd
+        bra     .cn
+; an obstacle: v' = (v - 2 (v.d)/(d.d) d) / 2 with d = craft - entity
+; (the outward normal, scaled by 1/4 so d.d fits a divisor)
+.wall:  neg.w   d0
+        neg.w   d1
+        asr.w   #2,d0
+        asr.w   #2,d1
+        move.w  c_vx(a0),d3
+        muls.w  d0,d3
+        move.w  c_vz(a0),d4
+        muls.w  d1,d4
+        add.l   d4,d3               ; v.d
+        bpl     .cn                 ; moving out, or along: let it go
+        move.w  od_crad(a3),d2      ; a bump? |v.d| >= bump_v * |d|, with
+        add.w   #craft_r,d2         ; |d| ~ R/4 at contact (scaled d)
+        mulu.w  #bump_v*64,d2       ; bump_v * 256 (8.8) * R/4
+        move.l  d3,d4
+        neg.l   d4
+        cmp.l   d2,d4
+        blt.s   .push               ; a push, not a bump
+        lea     hurt_t(pc),a3
+        tst.w   (a3)
+        bne.s   .push               ; hurt just now: no more damage
+        moveq   #-1,d2
+        bsr     .shd                ; (keeps d0, d1, d3)
+.push:  add.l   d3,d3               ; 2 v.d
+        move.w  d0,d4
+        muls.w  d4,d4
+        move.w  d1,d2
+        muls.w  d2,d2
+        add.l   d2,d4               ; d.d (>= 64: the craft enters by at
+        divs.w  d4,d3               ; most a beat's move) -> t = 2 v.d/d.d
+        muls.w  d3,d0               ; t dx
+        muls.w  d3,d1               ; t dz
+        move.w  c_vx(a0),d2
+        ext.l   d2
+        sub.l   d0,d2
+        asr.l   #1,d2               ; reflected, halved
+        move.w  d2,c_vx(a0)
+        move.w  c_vz(a0),d2
+        ext.l   d2
+        sub.l   d1,d2
+        asr.l   #1,d2
+        move.w  d2,c_vz(a0)
+        move.l  c_ox(a0),c_px(a0)   ; undo the beat's move
+        move.l  c_oz(a0),c_pz(a0)
+        bra.s   .end                ; one wall a beat: the move is undone
+.cn:    cmpa.l  (sp),a2
+        blo     .cl
+.end:   addq.l  #4,sp
+        move.w  (sp)+,d0
+        cmp.w   shield(pc),d0
+        beq.s   .done               ; unchanged
+        move.w  shield(pc),d0
+        bgt.s   .alive
+        bsr     craft_reset         ; zero: start over (M4: the crack,
+        bra     shield_reset        ; the next craft); tail call
+.alive: bra     shield_bar          ; tail call
+.done:  rts
+; .shd: the shield changes by d2.w (signed, capped at shield_max); a
+; loss starts the hurt timer and turns the sight red. Trashes a3.
+.shd:   lea     shield(pc),a3
+        add.w   d2,(a3)
+        cmp.w   #shield_max,(a3)
+        ble.s   .s1
+        move.w  #shield_max,(a3)
+.s1:    tst.w   d2
+        bpl.s   .s2
+        lea     hurt_t(pc),a3
+        move.w  #hurt_b,(a3)
+        lea     sight_col(pc),a3
+        move.b  #col_red,(a3)
+.s2:    rts
+
+; ------------------------------------------------------------- shield reset
+; shield_reset: a full shield, no hurt, the sight green, the bar drawn.
+; In:      none
+; Out:     shield, hurt_t, sight_col, the shield bar
+; Trashes: d0-d4, a0, a1
+shield_reset:
+        lea     shield(pc),a0
+        move.w  #shield_max,(a0)
+        lea     hurt_t(pc),a0
+        clr.w   (a0)
+        lea     sight_col(pc),a0
+        move.b  #col_green,(a0)
+        bra     shield_bar          ; tail call
+
 
 ; --------------------------------------------------------------- shots step
 ; shots_step: one beat of the player's shots. Fire: with Space held and

@@ -1,6 +1,6 @@
 ; strip.asm -- glider: the top strip and the sight (spec 5.4): the
-; four-corner sight over the play area, the heading-up radar at the
-; centre of the strip. Included by glider.asm.
+; four-corner sight over the play area, the shield bar at the left of
+; the strip, the heading-up radar at its centre. Included by glider.asm.
 
 ; -------------------------------------------------------------- sight erase
 ; sight_erase: at the erase stage, clear the sight this buffer shows
@@ -88,6 +88,40 @@ radar_frame:
         or.b    #$80>>((rad_x-rad_rx+1)&7),rad_y*scr_llen+((rad_x-rad_rx+1)>>3)*2(a4)
         or.b    #$80>>((rad_x+rad_rx)&7),rad_y*scr_llen+((rad_x+rad_rx)>>3)*2(a4)
         or.b    #$80>>((rad_x+rad_rx-1)&7),rad_y*scr_llen+((rad_x+rad_rx-1)>>3)*2(a4)
+        rts
+
+; --------------------------------------------------------------- shield bar
+; shield_bar: the shield at the top left of the strip, into both screens
+; at once (it changes rarely, and nothing else draws there): shield_max
+; slots of 8 px, 16 px apart, on rows sb_y..sb_y+5; a full slot solid,
+; an empty one only its floor row; green, red at shield_low or less.
+; In:      none
+; Out:     none
+; Trashes: d0-d4, a0, a1
+shield_bar:
+        move.w  shield(pc),d2
+        move.w  #$ff00,d3           ; a slot's word: green (the even byte)
+        cmp.w   #shield_low,d2
+        bgt.s   .grn
+        move.w  #$00ff,d3           ; red (the odd byte)
+.grn:   lea     scr0+sb_y*scr_llen+sb_x/4,a0
+        bsr.s   .bar
+        lea     scr1+sb_y*scr_llen+sb_x/4,a0
+.bar:   moveq   #0,d1               ; slot index
+.slot:  moveq   #0,d4
+        cmp.w   d2,d1
+        bge.s   .emp
+        move.w  d3,d4               ; full
+.emp:   move.w  d4,(a0)
+        move.w  d4,scr_llen(a0)
+        move.w  d4,2*scr_llen(a0)
+        move.w  d4,3*scr_llen(a0)
+        move.w  d4,4*scr_llen(a0)
+        move.w  d3,5*scr_llen(a0)   ; the floor
+        addq.l  #4,a0               ; next slot: 16 px on
+        addq.w  #1,d1
+        cmp.w   #shield_max,d1
+        blt.s   .slot
         rts
 
 ; --------------------------------------------------------------- radar tabs

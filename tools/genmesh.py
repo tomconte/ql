@@ -111,6 +111,11 @@ GAME_ON_RADAR = {"mine"}
 # that stop shots and are never destroyed.
 GAME_HP = {"mine": 1}
 
+# What touching a mesh does (spec 7): absent = an obstacle (the craft
+# bounces off, 1 shield); else the entity is consumed and the shield
+# changes by the value (a mine -2, an energy pack will be +2).
+GAME_TOUCH = {"mine": -2}
+
 SHOW_RADIUS = 84        # parade: projection-safe bound (Z0=300, focal
                         # 256/170): the cube's 83 is proven on screen (x
                         # 256+-98, y 120+-66, clear of the meter rows at 240)
@@ -273,7 +278,8 @@ def emit_game():
     print("; directory, 32 bytes per object: nvtx-1, nfaces-1, nedges-1, colour,")
     print("; v/f/e/n offsets from meshes, ybase (centre to lowest point),")
     print("; mesh radius, collision radius (x/z extent), radar blip colour")
-    print("; (0 = not on the radar), hits to destroy (0 = an obstacle), pad")
+    print("; (0 = not on the radar), hits to destroy (0 = an obstacle),")
+    print("; contact (0 = an obstacle, else consumed: shield += it), pad")
     print(f"nobjs       equ     {len(out_meshes)}")
     for i, m in enumerate(out_meshes):
         print(f"msh_{m[0]:<8}equ     {i}")
@@ -287,7 +293,7 @@ def emit_game():
               f"m_{name}_e-meshes,m_{name}_n-meshes")
         blip = COLOURS[colour] if name in GAME_ON_RADAR else 0
         print(f"        dc.w    {ybase},{radius},{colrad},{blip}")
-        print(f"        dc.w    {GAME_HP.get(name, 0)},0,0,0")
+        print(f"        dc.w    {GAME_HP.get(name, 0)},{GAME_TOUCH.get(name, 0)},0,0")
 
 if "--game" in sys.argv[1:]:
     emit_game()

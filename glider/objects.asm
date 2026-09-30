@@ -17,8 +17,8 @@
 ; Out:     this buffer's erase-box list rebuilt (sight_hit[d7]: one of
 ;          them overlaps the sight), the blips appended to the dot list
 ;          (dl_next, count), near (the entities inside the world box,
-;          for the shots), ocam (oc_n = objects drawn), xbeats (frame
-;          edges polled)
+;          for the shots), close (those within r_close, for craft_hit),
+;          ocam (oc_n = objects drawn), xbeats (frame edges polled)
 ; Trashes: d0-d6, a0-a3, a5, a6, cur, vscr, cwrk
 objects:
         lea     craft(pc),a0
@@ -38,6 +38,8 @@ objects:
         clr.b   (a0,d7.w)           ; and clear of the sight
         lea     near(pc),a0
         clr.w   (a0)
+        lea     close(pc),a0
+        clr.w   (a0)
         lea     entpool(pc),a5
 .ent:   tst.w   e_mesh(a5)
         bmi     .edone              ; end of the pool
@@ -55,6 +57,7 @@ objects:
         neg.w   d1
 .bx:    cmp.w   #r_active,d1
         bge     .enext
+        move.w  d1,d6               ; |dx|, for the close test
         move.w  e_z(a5),d2
         sub.w   ocam+oc_pz(pc),d2
         lsl.w   #16-sector_sh,d2
@@ -64,7 +67,16 @@ objects:
         neg.w   d1
 .bz:    cmp.w   #r_active,d1
         bge     .enext
-        lea     near(pc),a0         ; near: what the shots test next frame
+        cmp.w   #r_close,d1         ; close: what craft_hit tests next
+        bge.s   .far                ; frame (usually nothing)
+        cmp.w   #r_close,d6
+        bge.s   .far
+        lea     close(pc),a0
+        move.w  (a0),d1
+        addq.w  #1,(a0)
+        lsl.w   #2,d1
+        move.l  a5,2(a0,d1.w)
+.far:   lea     near(pc),a0         ; near: what the shots test next frame
         move.w  (a0),d1
         addq.w  #1,(a0)
         lsl.w   #2,d1

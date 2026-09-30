@@ -32,7 +32,7 @@
 ;   macros.inc   wbound, beat_poll
 ;   this file    job header, takeover, frame loop
 ;   flight.asm   flight_step, craft_reset
-;   combat.asm   the player's shots: step (per beat), draw
+;   combat.asm   the craft's collisions and shield, the player's shots
 ;   lattice.asm  the lattice stage, wedge records
 ;   objects.asm  the object stage
 ;   render.asm   list selectors, the erase stages, erase-box extend,
@@ -123,6 +123,7 @@ main:
         lea     scr1,a4
         bsr     radar_frame
         bsr     radar_tabs          ; the sweep's pixel lists (screen 0)
+        bsr     shield_reset        ; full, and its bar in both screens
 
         bsr     craft_reset         ; spawn in the open field
         move.b  #1<<pc__frame,pc_intr   ; discard any pending frame bit
@@ -167,17 +168,19 @@ frame_loop:
         and.b   d0,d3               ; d3 = newly pressed
         btst    #k1__enter,d3
         beq.s   .nrst
-        bsr     craft_reset         ; Enter: back to the spawn point
+        bsr     craft_reset         ; Enter: back to the spawn point,
+        bsr     shield_reset        ; the shield full
 .nrst:
 
 ; ----- simulation: one step per beat of the previous loop (1..3), so
 ; everything stays defined per 20 ms whatever the frame rate (spec 2.1):
-; the flight model, then the shots
+; the flight model, the craft's collisions, the shots
         move.w  headroom+16(pc),d6
         subq.w  #1,d6
 .beat:  lea     craft(pc),a0
         lea     sintab(pc),a1
         bsr     flight_step
+        bsr     craft_hit           ; walls, mines, the shield (spec 7)
         bsr     shots_step          ; fire, move, hit (spec 7)
         dbf     d6,.beat
 

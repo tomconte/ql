@@ -132,7 +132,10 @@ flight_step:
         sub.w   d2,d1
         move.w  d1,c_vz(a0)
 .ncap:
-; --- position, wrapped into the sector (spec 6): 0..sector-1, 16.8
+; --- position, wrapped into the sector (spec 6): 0..sector-1, 16.8;
+; the last one is kept for craft_hit, which undoes a move into a wall
+        move.l  c_px(a0),c_ox(a0)
+        move.l  c_pz(a0),c_oz(a0)
         ext.l   d0
         add.l   d0,c_px(a0)
         andi.l  #(sector<<8)-1,c_px(a0)
@@ -142,16 +145,18 @@ flight_step:
         rts
 
 ; -------------------------------------------------------------- craft reset
-; craft_reset: spawn between four lattice points, looking along +z, at
+; craft_reset: spawn at (spawn_x, spawn_z) looking along spawn_head, at
 ; rest.
 ; In:      none
 ; Out:     a0 = craft, the record reset
 ; Trashes: none
 craft_reset:
         lea     craft(pc),a0
-        move.l  #(latd/2)<<8,c_px(a0)
-        move.l  #(latd/2)<<8,c_pz(a0)
-        clr.w   c_head(a0)
+        move.l  #(spawn_x&(sector-1))<<8,c_px(a0)
+        move.l  #(spawn_z&(sector-1))<<8,c_pz(a0)
+        move.l  c_px(a0),c_ox(a0)
+        move.l  c_pz(a0),c_oz(a0)
+        move.w  #spawn_head,c_head(a0)
         clr.w   c_turn(a0)
         clr.w   c_vx(a0)
         clr.w   c_vz(a0)

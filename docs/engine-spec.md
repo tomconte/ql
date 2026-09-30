@@ -391,7 +391,10 @@ Elements:
   sweep would halve its share. Out-of-range generators pinned to the
   rim at their bearing: still open (section 12).
 - **Shield bar**, top left: 8 segments, green, red at 2 or less, the
-  spare craft as small icons under it. **Score** (6 digits,
+  spare craft as small icons under it. Built in M3 (`shield_bar`):
+  8-px slots 16 px apart from x 16, rows 8..13, a full slot solid, an
+  empty one its floor row; drawn straight into both screens when the
+  shield changes. **Score** (6 digits,
   `draw_dec`) and **generators left** (a crystal icon and the count),
   top right. All redrawn only when they change, into both buffers.
 - **No text messages** (**decided**: no ENEMY TO LEFT and the like).
@@ -519,6 +522,19 @@ runs once per beat (section 2.1).
   generator = 1 shield and a bounce (velocity reflected and halved);
   player vs glider = 1 shield and a bounce for both; player vs mine
   = 2 shield, mine destroyed; player over an energy pack = +2 shield.
+  Built in M3 (2026-09-30, `craft_hit` in `combat.asm`, one step per
+  beat): the craft is a circle of `craft_r` 32; the object stage lists
+  the entities within `r_close` 512 (two frames of flight plus the
+  largest contact distance), so the usual beat tests nothing. The mesh
+  directory's `od_touch` says what contact does: 0 = an obstacle, else
+  the entity is consumed and the shield changes by it (mine -2, the
+  energy pack will be +2). The bounce reflects the velocity about the
+  contact normal, halves it, and undoes the beat's move, so the craft
+  never stays inside. Only a bump costs shield -- at least `bump_v` 6
+  units a beat along the normal, and once in `hurt_b` 25 beats --
+  since leaning on a wall with thrust held drained 2 shield a second.
+  Collision circles are the meshes' x/z extents, so a block (a 192
+  cube, circle 136) stops the craft ~70 units short of a face.
 - **Player shots** (**decided**: several in flight, arcade): up to 4,
   one every `fire_cd` beats while Space is held, speed `shot_v`, life
   `shot_life` beats. Launched alternately from two gun ports (44 units
@@ -546,7 +562,8 @@ runs once per beat (section 2.1).
   hit the player inside `craft_r` and are stopped by obstacles.
 - **Damage**: `shield` holds 8. A hit turns the sight red (section
   5.4) and plays the damage sound; zero = craft destroyed, windshield
-  crack, next craft (section 6).
+  crack, next craft (section 6). Until M4, zero restarts the craft at
+  the spawn with a full shield.
 - **Explosions**: dot sparks (section 5.6).
 
 ## 8. Sound

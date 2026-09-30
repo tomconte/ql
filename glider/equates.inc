@@ -107,6 +107,23 @@ rad_swmax   equ     (rad_rx+1)/2    ; sweep dots: every other one of <= rad_rx
                                     ; steps (max(|dx|, |dy|), rad_rx >= rad_ry)
 rad_stride  equ     2+rad_swmax*4   ; one list: count, records
 
+; ----- the craft's collisions and shield (spec 7): the craft is a circle
+; of craft_r; entities within r_close (two frames of flight plus the
+; largest contact distance, 136 + 32) are listed by the object stage for
+; craft_hit. Bumping an obstacle at bump_v or more costs 1 shield, at
+; most once in hurt_b beats; any loss turns the sight red for flash_b
+; beats. First values
+; (2026-09-30), to be tuned by feel.
+craft_r     equ     32
+r_close     equ     512
+shield_max  equ     8
+shield_low  equ     2               ; the bar turns red at this or less
+bump_v      equ     6               ; units/beat along the normal: a bump
+hurt_b      equ     25
+flash_b     equ     6
+sb_x        equ     16              ; the shield bar: x (a multiple of 8),
+sb_y        equ     8               ; first row (6 rows)
+
 ; ----- player shots (spec 7): up to nshots in flight, one every fire_cd
 ; beats while Space is held, shot_v units a beat for shot_life beats
 ; (range 2000, inside zfar), launched alternately from the gun ports
@@ -134,6 +151,11 @@ no_lat      equ     0               ; skip the lattice (erase still runs)
 no_hud      equ     0               ; skip the flight readouts
 no_obj      equ     0               ; skip the objects (box erase still runs)
 no_rad      equ     0               ; skip the radar's sweep and blips
+; the spawn point (M4: per sector): between four lattice points, looking
+; along +z. Moved for unattended tests, e.g. in front of a tower.
+spawn_x     equ     latd/2
+spawn_z     equ     latd/2
+spawn_head  equ     0               ; 8.8 brads
 ; test_keys: row-1 bits held down on every loop, for unattended runs
 ; under make shot (qlshot cannot press keys): e.g. 1<<k1__right pivots
 ; the craft so every object sweeps across the screen. 0 in a real build.
@@ -150,7 +172,9 @@ c_stop      equ     16              ; word, beats at rest with Down held
 c_rev       equ     18              ; word, 1 = reversing
 c_s         equ     20              ; word, sin head (8.8)
 c_c         equ     22              ; word, cos head (8.8)
-c_size      equ     24
+c_ox        equ     24              ; long, the position before the last
+c_oz        equ     28              ;   move (flight_step, for craft_hit)
+c_size      equ     32
 
 ; entity record (entpool, 16 bytes; the level table has the same shape)
 e_mesh      equ     0               ; word, directory index; -1 ends the pool
@@ -192,6 +216,8 @@ od_rad      equ     18              ; bounding radius
 od_crad     equ     20              ; collision radius (M3)
 od_blip     equ     22              ; radar blip colour (0 = not shown)
 od_hp       equ     24              ; hits to destroy (0 = an obstacle)
+od_touch    equ     26              ; contact: 0 = an obstacle (bounce),
+                                    ; else consumed, shield += it (mine -2)
 
 ; camera block for the object stage (ocam)
 oc_px       equ     0               ; word, camera x, integer units (0..sector-1)

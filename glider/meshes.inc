@@ -197,7 +197,8 @@ m_mine_n:
 ; directory, 32 bytes per object: nvtx-1, nfaces-1, nedges-1, colour,
 ; v/f/e/n offsets from meshes, ybase (centre to lowest point),
 ; mesh radius, collision radius (x/z extent), radar blip colour
-; (0 = not on the radar), hits to destroy (0 = an obstacle), pad
+; (0 = not on the radar), hits to destroy (0 = an obstacle),
+; contact (0 = an obstacle, else consumed: shield += it), pad
 nobjs       equ     3
 msh_tower   equ     0
 yb_tower    equ     192
@@ -217,4 +218,4 @@ objdir:
         dc.w    5,7,11,1    ; red
         dc.w    m_mine_v-meshes,m_mine_f-meshes,m_mine_e-meshes,m_mine_n-meshes
         dc.w    42,70,70,1
-        dc.w    1,0,0,0
+        dc.w    1,-2,0,0
