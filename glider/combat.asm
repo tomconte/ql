@@ -12,12 +12,11 @@
 ; nearby entity each beat cost ~8 ms a frame). A hit stops the shot; an
 ; entity whose mesh has od_hp takes it (e_hp) and goes (e_flags = 0) at
 ; od_hp hits, the rest are obstacles. A target gone meanwhile (another
-; shot got it) means a new cast from where the shot is. Last, the sight
-; blinks (blink_b beats on, as many off) while any shot is in flight.
-; With none in flight and Space up it returns at once.
+; shot got it) means a new cast from where the shot is. With none in
+; flight and Space up it returns at once. (The sight's blink while shots
+; flew, spec v0.2, was dropped on 2026-09-30: it annoyed in play.)
 ; In:      d5.b = held keys (row-1 bits)
-; Out:     shots, nlive, fire_t, gun_lr, blink, sight_col; entities hit
-;          (e_hp, e_flags)
+; Out:     shots, nlive, fire_t, gun_lr; entities hit (e_hp, e_flags)
 ; Trashes: d0-d4, a0-a3, a5
 shots_step:
         lea     fire_t(pc),a2
@@ -116,24 +115,8 @@ shots_step:
         lea     shots+nshots*sh_size(pc),a0
         cmpa.l  a0,a1
         blo.s   .shot
-; --- the sight blinks while a shot is in flight, steady otherwise
         lea     nlive(pc),a0
         move.w  d4,(a0)
-        lea     blink(pc),a0
-        moveq   #col_green,d0
-        tst.w   d4
-        bne.s   .blk
-        clr.w   (a0)
-        bra.s   .sc
-.blk:   addq.w  #1,(a0)
-        cmp.w   #2*blink_b,(a0)
-        blo.s   .ph
-        clr.w   (a0)
-.ph:    cmp.w   #blink_b,(a0)
-        blo.s   .sc
-        moveq   #0,d0               ; the off half
-.sc:    lea     sight_col(pc),a0
-        move.b  d0,(a0)
         rts
 
 ; ---------------------------------------------------------------- shot cast

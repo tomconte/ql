@@ -75,12 +75,11 @@ bbox1:  dc.w    0
         ds.w    maxobj*4
 
 ; player shots (sh_* offsets), the autofire cooldown, the gun port
-; toggle, the sight's blink phase (beats)
+; toggle
 shots:  ds.b    nshots*sh_size
 nlive:  dc.w    0                   ; shots in flight
 fire_t: dc.w    0
 gun_lr: dc.w    0
-blink:  dc.w    0
 ; near: the entities inside the world box (the object stage, each
 ; frame), for the shots' hit tests: count, pointers
 near:   dc.w    0

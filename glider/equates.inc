@@ -120,7 +120,6 @@ shot_len    equ     64
 gun_dx      equ     44
 gun_dy      equ     48
 shot_ym     equ     gun_dy*yfocal*16/xfocal ; sy = horizon + (invtab*it)>>16
-blink_b     equ     6               ; the sight blinks blink_b beats on, off
 
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255

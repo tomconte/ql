@@ -201,7 +201,7 @@ Frame order in the back buffer `a4`:
 5. Objects: world cull, frustum cull, transform, project, clip, face
    cull, draw.
 6. Shots, sparks and fragments (sections 5.6, 7).
-7. HUD: the sight unless it is blinked off, the radar sweep and
+7. HUD: the sight (red while flashing a hit), the radar sweep and
    blips, strip readouts when they change, meters.
 8. VBL wait, flip, beat count. The frame bit cannot count two missed
    edges, so the work polls it at stage boundaries (after the lattice,
@@ -358,10 +358,11 @@ Elements:
   No lock state. The stalks are the line of fire: with yaw only,
   everything dead ahead projects to x = 256 at any range and height,
   so a glider skimming below the eye sits on the lower stalk. It
-  blinks (6 beats on, 6 off, about 4 Hz) while any player shot is in
-  flight, so continuously under autofire, and shows red for 6 beats
-  when the craft is hit (the damage flash the horizon line used to
-  carry). Built in M3 (2026-09-29, `strip.asm`): x 240..272 between
+  shows red for 6 beats when the craft is hit (the damage flash the
+  horizon line used to carry). v0.2 also had it blink (6 beats on, 6
+  off) while any player shot was in flight; built in M3 and dropped
+  the next day (**decided** 2026-09-30): under autofire it blinked
+  continuously, and it annoyed in play. Built in M3 (2026-09-29, `strip.asm`): x 240..272 between
   the legs, stalks at x 256; one macro (`sight_ops`) expands to the
   `or.b` draw after the objects and the `and.b` clear, which runs in
   the erase stage only when the buffer shows a different colour than
@@ -706,7 +707,7 @@ initialise with `lea label(pc)` at runtime. No self-modifying code
 3. **M3 combat**: first the v0.2 groundwork -- the top strip (clip
    top at row 28, the sight, the radar), the erase without
    self-modifying code, the wrapping sector -- then shots (per beat,
-   gun ports, the sight's blink), collisions, shield and hit flash,
+   gun ports), collisions, shield and hit flash,
    sparks, enemy gliders and their AI, generators launching them,
    mines, sound. **Groundwork done 2026-09-29** (branch
    `m3-groundwork`): the frame loop's stages became routines, the
@@ -737,7 +738,8 @@ launch the enemy gliders; abstract enemy gliders (dart, wedge, kite),
 a few at a time; mines kept; energy packs refill the shield; an
 8-unit shield with a bar; three craft; the windshield crack; several
 player shots with autofire from two gun ports; the four-corner sight,
-32 px, no lock, blinking while shots fly; the radar strip at the top,
+32 px, no lock (its blink while shots fly: dropped 2026-09-30); the
+radar strip at the top,
 no text messages; dot-spark explosions; the stark black look with no
 horizon line or skyline; a 3-beat design budget with the game the
 same at any frame rate; no self-modifying code.
