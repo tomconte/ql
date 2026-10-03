@@ -438,6 +438,22 @@ whole object per frame (~13 ms, section 9).
   exploding object per frame (estimate).
 - Option: four short edge fragments tumbling out with the sparks,
   ~0.25 ms each as clipped 3D segments.
+- Built in M3 (2026-10-03, `boom.asm`): there is no spark physics at
+  run time. `tools/gensparks.py` steps each burst per beat offline
+  (launch speeds 6..13 units a beat plus 7 up, gravity 1.8, the
+  bounce at a third of the speed, lives of 12..20 beats; a seed chosen
+  for a balanced burst) and emits, per age, the live sparks' (x, y)
+  offsets as signed bytes, with the burst's extent in a header. An
+  explosion is a 16-byte record (position, colour, age, mirror flag)
+  that ages by the loop's beats; per frame its centre is transformed
+  and two divides give the scale at its depth, then each spark costs
+  two multiplies and a bset into the dot list; a burst wholly on
+  screen skips the per-spark bounds. Drawn after the sight, so erasing
+  a spark never eats the sight (a spark records only pixels it turned
+  on). Measured: ~2.9 ms a frame while all 16 sparks of a burst live
+  (its first 12 beats), less as they die; 4 explosions at most. Mines
+  burst 16 sparks; their red sparks read close to the red lattice dots
+  from afar.
 
 ## 6. World and entities
 

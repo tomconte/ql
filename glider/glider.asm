@@ -33,6 +33,7 @@
 ;   this file    job header, takeover, frame loop
 ;   flight.asm   flight_step, craft_reset
 ;   combat.asm   the craft's collisions and shield, the player's shots
+;   boom.asm     explosions: dot sparks from precomputed bursts
 ;   lattice.asm  the lattice stage, wedge records
 ;   objects.asm  the object stage
 ;   render.asm   list selectors, the erase stages, erase-box extend,
@@ -41,7 +42,8 @@
 ;   strip.asm    the sight, the radar (the top strip)
 ;   vars.inc     variables and scratch
 ;   level.inc    static entity table
-;   then meshes.inc and sin.inc (generated), the supervisor stack, the
+;   then meshes.inc, sparks.inc and sin.inc (generated), the supervisor
+;   stack, the
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
 ; Code lives in .asm files, everything else (equates, macros, data)
 ; in .inc files. Every routine and macro carries a register contract
@@ -214,6 +216,12 @@ frame_loop:
 ; line of fire.
         bsr     sight_draw
 
+; ----- explosions: dot sparks, after the sight so that erasing them
+; never eats it (spec 5.6; they need the object stage's ocam)
+        ifeq    no_obj
+        bsr     boom_draw
+        endc
+
 ; ----- top strip: the radar's sweep (its frame is static; the blips
 ; come from the object stage)
         ifeq    no_rad
@@ -266,6 +274,7 @@ frame_loop:
 
         include "flight.asm"
         include "combat.asm"
+        include "boom.asm"
         include "lattice.asm"
         include "objects.asm"
         include "render.asm"
@@ -275,6 +284,7 @@ frame_loop:
         include "level.inc"
 
         include "meshes.inc"
+        include "sparks.inc"
         include "sin.inc"
 
 ; The supervisor stack: the deepest path in M2 was ~30 bytes (the

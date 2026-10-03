@@ -62,7 +62,8 @@ maxdots     equ     128             ; lattice dots per buffer (checked per
                                     ; row: a row of slack follows)
 rad_dots    equ     64              ; radar sweep + blip dots per buffer
                                     ; (the sweep takes up to rad_swmax)
-dl_recs     equ     maxdots+2*nwin+1+rad_dots   ; dot list records
+spk_dots    equ     64              ; explosion sparks per buffer
+dl_recs     equ     maxdots+2*nwin+1+rad_dots+spk_dots ; dot list records
 
 ; ----- objects (spec sections 5.1, 5.2, 6). The near plane for meshes
 ; is closer than the lattice's: their edges are clipped, the dots are
@@ -123,6 +124,10 @@ hurt_b      equ     25
 flash_b     equ     6
 sb_x        equ     16              ; the shield bar: x (a multiple of 8),
 sb_y        equ     8               ; first row (6 rows)
+
+; ----- explosions (spec 5.6): up to nboom at once, each a burst from
+; sparks.inc (tools/gensparks.py: spk_n sparks for spk_life beats)
+nboom       equ     4
 
 ; ----- player shots (spec 7): up to nshots in flight, one every fire_cd
 ; beats while Space is held, shot_v units a beat for shot_life beats
@@ -201,6 +206,24 @@ sh_hit      equ     18              ; word, the life at which it hits sh_tgt
                                     ; (shot_cast), 0 = nothing on its path
 sh_tgt      equ     20              ; long, the entity it will hit
 sh_size     equ     24
+
+; explosion record (booms)
+bm_live     equ     0               ; word, beats left, 0 = free
+bm_x        equ     2               ; word, centre, world units
+bm_z        equ     4
+bm_y        equ     6               ; word, centre height over the ground
+bm_col      equ     8               ; word, colour (od_col: 1 red, 2 green,
+                                    ; 3 white)
+bm_mir      equ     10              ; word, nonzero: the burst mirrored
+bm_pat      equ     12              ; long, the burst (sparks.inc)
+bm_size     equ     16
+
+; spark pattern header (sparks.inc, tools/gensparks.py)
+spx_xm      equ     0               ; word, the burst's largest |x|,
+spx_y0      equ     2               ;   smallest y, largest y (stored
+spx_y1      equ     4               ;   units of spk_scale, y down)
+spx_rows    equ     6               ; word[spk_life]: each age's row, as
+                                    ; an offset from the pattern
 
 ; mesh directory entry (objdir in meshes.inc, 32 bytes)
 od_nv       equ     0               ; nvtx-1

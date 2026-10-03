@@ -86,7 +86,8 @@ craft_hit:
         move.w  od_touch(a3),d2
         beq.s   .wall
         clr.w   e_flags(a5)         ; consumed (a mine)
-        bsr     .shd
+        bsr     boom_add
+        bsr     shield_add
         bra     .cn
 ; an obstacle: v' = (v - 2 (v.d)/(d.d) d) / 2 with d = craft - entity
 ; (the outward normal, scaled by 1/4 so d.d fits a divisor)
@@ -111,7 +112,7 @@ craft_hit:
         tst.w   (a3)
         bne.s   .push               ; hurt just now: no more damage
         moveq   #-1,d2
-        bsr     .shd                ; (keeps d0, d1, d3)
+        bsr     shield_add          ; (keeps d0, d1, d3)
 .push:  add.l   d3,d3               ; 2 v.d
         move.w  d0,d4
         muls.w  d4,d4
@@ -146,9 +147,16 @@ craft_hit:
         bra     shield_reset        ; the next craft); tail call
 .alive: bra     shield_bar          ; tail call
 .done:  rts
-; .shd: the shield changes by d2.w (signed, capped at shield_max); a
-; loss starts the hurt timer and turns the sight red. Trashes a3.
-.shd:   lea     shield(pc),a3
+
+; --------------------------------------------------------------- shield add
+; shield_add: the shield changes by d2.w (signed, capped at shield_max;
+; craft_hit deals with zero); a loss starts the hurt timer and turns the
+; sight red.
+; In:      d2.w = the change
+; Out:     shield, hurt_t, sight_col
+; Trashes: a3
+shield_add:
+        lea     shield(pc),a3
         add.w   d2,(a3)
         cmp.w   #shield_max,(a3)
         ble.s   .s1
@@ -283,6 +291,7 @@ shots_step:
         cmp.w   e_hp(a5),d0
         bgt.s   .snext
         clr.w   e_flags(a5)         ; destroyed
+        bsr     boom_add
         bra.s   .snext
 .fly:   addq.w  #1,d4
 .snext: lea     sh_size(a1),a1

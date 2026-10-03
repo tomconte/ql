@@ -106,6 +106,7 @@ tools/
   gensin.py       sine table (8.8 fixed point) as a vasm include
   genmesh.py      meshes as data, validated (closed, consistent winding)
                   and emitted as vasm include tables
+  gensparks.py    glider's explosion bursts, precomputed per beat
   regcheck.py     register-contract checker, run by make before vasm
   qlshot.py       screenshots + memory peeks of a running Q-emuLator,
                   read from the process (make shot)

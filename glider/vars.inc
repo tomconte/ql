@@ -87,6 +87,11 @@ near:   dc.w    0
         ds.l    nent
 close:  dc.w    0
         ds.l    nent
+; explosions (bm_* offsets), how many are live, the mirror toggle
+booms:  ds.b    nboom*bm_size
+nbooms: dc.w    0
+boom_mir:
+        dc.w    0
 shield: dc.w    shield_max
 hurt_t: dc.w    0                   ; beats since a hit, counting down
 
