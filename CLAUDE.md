@@ -31,7 +31,8 @@ exact, mode 4/8 decoded, 512×512). Prefer peeking a meter's variable
 over reading its digits off the image — labels come from the `<name>.lst`
 listing `make` now writes, relocated to the job's load address.
 `qlshot.py shot/peek/info/close` work on an emulator that is already
-running. Keyboard input is not simulated: what you can check is what the
+running; each call stalls the emulation for a moment, so time against
+the wall clock only with peeks 5 s or more apart. Keyboard input is not simulated: what you can check is what the
 program does unattended (glider: set `test_keys` in `equates.inc` to hold
 keys down, e.g. Right to sweep every object across the screen). Internals, and how to re-derive them after an
 emulator update: `docs/qemulator.md` "Looking inside a running
