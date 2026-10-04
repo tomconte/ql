@@ -1,5 +1,25 @@
 ; hud.asm -- glider: the HUD band: flight readouts, meters, headroom
-; bar. Included by glider.asm.
+; bar; the frame's sound effect. Included by glider.asm.
+
+; ------------------------------------------------------------------ sfx play
+; sfx_play: the frame's sound effect, if one was asked for (sfx: the
+; highest priority wins), sent to the 8049 (~2 ms). An IPC transfer like
+; the KEYROW read, so it goes where that goes: after the work, before
+; the VBL wait (spec 8, CLAUDE.md rule 13).
+; In:      none
+; Out:     sfx_want cleared
+; Trashes: d0-d2, a3
+sfx_play:
+        lea     sfx_want(pc),a3
+        moveq   #0,d0
+        move.b  (a3),d0
+        beq.s   .none
+        clr.b   (a3)
+        lsl.w   #3,d0
+        lea     sfx_tab-8(pc),a3
+        adda.w  d0,a3
+        bra     snd_beep            ; tail call
+.none:  rts
 
 ; ---------------------------------------------------------------- HUD readouts
 ; draw_hud: four decimal fields (lib/draw_dec.asm, self-erasing):

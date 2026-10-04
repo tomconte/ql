@@ -3,12 +3,18 @@
 
 ; ---------------------------------------------------------------- boom add
 ; boom_add: an explosion where an entity has just gone (spec 5.6): its
-; mesh's burst (od_spk: one per centre height) in its colour.
+; mesh's burst (od_spk: one per centre height) in its colour, and its
+; sound (a generator's the deeper one).
 ; In:      a5 = the entity
-; Out:     booms, nbooms, boom_mir
+; Out:     booms, nbooms, boom_mir, sfx_want
 ; Trashes: d0, a3
 boom_add:
-        move.l  a0,-(sp)
+        cmp.w   #msh_gen,e_mesh(a5)
+        bne.s   .small
+        sfx     sfx_big
+        bra.s   .snd
+.small: sfx     sfx_boom
+.snd:   move.l  a0,-(sp)
         move.w  e_mesh(a5),d0
         lsl.w   #5,d0
         lea     objdir(pc),a0
@@ -21,11 +27,12 @@ boom_add:
 
 ; ---------------------------------------------------------------- boom hit
 ; boom_hit: a puff of 4 sparks where a shot hit an entity without
-; destroying it (spec 5.6), in its colour.
+; destroying it (spec 5.6), in its colour, and the hit sound.
 ; In:      a5 = the entity
-; Out:     booms, nbooms, boom_mir
+; Out:     booms, nbooms, boom_mir, sfx_want
 ; Trashes: d0, a3
 boom_hit:
+        sfx     sfx_hit
         move.l  a0,-(sp)
         lea     spk_hit(pc),a0
         bsr.s   boom_put

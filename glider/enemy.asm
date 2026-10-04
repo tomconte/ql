@@ -471,8 +471,8 @@ glider_launch:
 ; beats, red; the static entity it will stop at is cast at launch
 ; (shot_cast), as for the player's shots.
 ; In:      a0 = the glider
-; Out:     carry clear: a shot fired (eshots, nelive); carry set: all
-;          neshots in flight; ccr
+; Out:     carry clear: a shot fired (eshots, nelive, sfx_want); carry
+;          set: all neshots in flight; ccr
 ; Trashes: d0-d3, a1, a3
 eshot_fire:
         lea     eshots(pc),a1
@@ -516,6 +516,7 @@ eshot_fire:
         move.w  #eshot_v,sh_v(a1)
         lea     nelive(pc),a3
         addq.w  #1,(a3)
+        sfx     sfx_efire
         movem.l a0/a5,-(sp)
         bsr     shot_cast
         movem.l (sp)+,a0/a5

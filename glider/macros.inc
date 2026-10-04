@@ -110,3 +110,17 @@ sight_ops macro
         \1.b    #$ff^\2,(horizon+11)*scr_llen+66(a0)
         \1.b    #$80^\2,(horizon+11)*scr_llen+68(a0)
         endm
+
+; sfx: ask for sound effect \1 (an sfx_* number: its priority) this
+; frame; the highest asked for is played at the end of the loop
+; (sfx_play, spec 8: one 8049 transfer a frame).
+; In:      none
+; Out:     sfx_want
+; Trashes: a3
+sfx     macro
+        lea     sfx_want(pc),a3
+        cmp.b   #\1,(a3)
+        bhs.s   .sx\@
+        move.b  #\1,(a3)
+.sx\@:
+        endm

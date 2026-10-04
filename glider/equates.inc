@@ -179,6 +179,15 @@ eshot_life  equ     45
 eshot_nose  equ     64
 eshot_len   equ     48              ; drawn length
 
+; ----- sound effects (spec 8, sounds.inc): the number is the priority;
+; the highest asked for in a frame is played at its end (sfx_play)
+sfx_fire    equ     1               ; the player's shot
+sfx_efire   equ     2               ; an enemy shot
+sfx_hit     equ     3               ; a hit that did not destroy
+sfx_dmg     equ     4               ; the craft loses shield
+sfx_boom    equ     5               ; an explosion
+sfx_big     equ     6               ; a generator's
+
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255
 hb_y        equ     254             ; bar top line (2 rows tall)
@@ -196,6 +205,7 @@ no_gls      equ     0               ; skip the gliders' and their shots'
                                     ; beats (the gliders freeze)
 no_gld      equ     0               ; skip the moving entities (gliders) in
                                     ; the object stage (not drawn, no blip)
+no_snd      equ     0               ; skip the sound effects
 ; the spawn point (M4: per sector): between four lattice points, looking
 ; along +z. Moved for unattended tests, e.g. in front of a tower.
 spawn_x     equ     latd/2

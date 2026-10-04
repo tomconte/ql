@@ -162,9 +162,9 @@ shield_check:
 ; --------------------------------------------------------------- shield add
 ; shield_add: the shield changes by d2.w (signed, capped at shield_max;
 ; shield_check deals with zero), marked for shield_check; a loss starts
-; the hurt timer and turns the sight red.
+; the hurt timer, turns the sight red and asks for the damage sound.
 ; In:      d2.w = the change
-; Out:     shield, shield_chg, hurt_t, sight_col
+; Out:     shield, shield_chg, hurt_t, sight_col, sfx_want
 ; Trashes: a3
 shield_add:
         lea     shield(pc),a3
@@ -176,6 +176,7 @@ shield_add:
         move.w  #1,(a3)
         tst.w   d2
         bpl.s   .s2
+        sfx     sfx_dmg
         lea     hurt_t(pc),a3
         move.w  #hurt_b,(a3)
         lea     sight_col(pc),a3
@@ -214,7 +215,7 @@ shield_reset:
 ; was dropped on 2026-09-30: it annoyed in play.)
 ; In:      d5.b = held keys (row-1 bits)
 ; Out:     shots, nlive, fire_t, gun_lr; entities hit (e_hp, e_flags),
-;          booms
+;          booms, sfx_want
 ; Trashes: d0-d4, a0-a3, a5
 shots_step:
         lea     fire_t(pc),a2
@@ -238,6 +239,7 @@ shots_step:
         bra     .move               ; all in flight
 .fire:  move.w  #fire_cd,(a2)
         addq.w  #1,nlive-fire_t(a2)
+        sfx     sfx_fire
         lea     craft(pc),a0
         move.w  c_s(a0),d1          ; s
         move.w  c_c(a0),d2          ; c

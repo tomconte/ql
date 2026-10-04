@@ -108,6 +108,9 @@ booms:  ds.b    nboom*bm_size
 nbooms: dc.w    0
 boom_mir:
         dc.w    0
+sfx_want:
+        dc.b    0                   ; the sound asked for this frame (0: none)
+        even
 shield: dc.w    shield_max
 shield_chg:
         dc.w    0                   ; nonzero: the shield changed this frame

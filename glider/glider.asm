@@ -40,11 +40,12 @@
 ;   objects.asm  the object stage
 ;   render.asm   list selectors, the erase stages, erase-box extend,
 ;                projection, clipping
-;   hud.asm      readouts, meters, meter window, headroom bar
+;   hud.asm      readouts, meters, meter window, headroom bar, sound
 ;   strip.asm    the sight, the radar (the top strip)
 ;   vars.inc     variables and scratch
 ;   level.inc    static entity table
 ;   types.inc    the enemy glider types
+;   sounds.inc   the sound effects
 ;   then meshes.inc, sparks.inc and sin.inc (generated), the supervisor
 ;   stack, the
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
@@ -303,6 +304,9 @@ frame_loop:
         lea     kbd_cur(pc),a2
         move.b  d0,(a2)
         endc
+        ifeq    no_snd
+        bsr     sfx_play            ; the frame's sound, if any (spec 8)
+        endc
         move.w  d6,d1
         moveq   #0,d0
 .wait:  addq.l  #1,d0               ; count idle spins = headroom
@@ -330,6 +334,7 @@ frame_loop:
         include "vars.inc"
         include "level.inc"
         include "types.inc"
+        include "sounds.inc"
 
         include "meshes.inc"
         include "sparks.inc"
