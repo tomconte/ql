@@ -11,9 +11,10 @@ projects the offsets with the victim's depth (spec 5.6: camera-aligned
 axes, no rotation -- a burst is isotropic), so only the across (x) and
 down (y) components are stored, in units of SCALE world units, y down.
 A pattern is three words of extent (below), then LIFE word offsets
-(one per age, from the pattern's label) to its rows; a row is the count of live sparks (a
-byte), then that many (x, y) pairs of signed bytes -- the dead ones
-are left out, so the game's loop never meets one. With it, the extent
+(one per age, from the pattern's label) to its rows; a row is the
+count of live sparks (a byte), then that many (x, y) pairs of signed
+bytes -- the dead ones are left out, so the game's loop never meets
+one. With it, the extent
 of the whole burst (largest |x|, smallest and largest y) lets the game
 skip the per-spark screen bounds when the burst is wholly on screen.
 Stdlib only, seeded: the output is the same every run.

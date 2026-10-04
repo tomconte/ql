@@ -748,7 +748,18 @@ initialise with `lea label(pc)` at runtime. No self-modifying code
    patched (four prebuilt row loops), the top strip (clip at 28, the
    sight, the radar at a 2304 range) and the 8192-unit wrapping sector
    with a test map that fits it; `test_keys` holds keys down for
-   unattended `make shot` runs. Budget in section 9.
+   unattended `make shot` runs. Budget in section 9. **Then, by
+   2026-10-03** (same branch): the dotted radar sweep, the sight
+   redrawn only when something cut it (its blink while shots fly was
+   built and dropped), the player's shots (section 7: autofire, gun
+   ports, hits cast at launch), the craft's collisions and shield
+   with the bar and the red flash (section 7), and the explosions
+   (section 5.6: precomputed bursts). Played on Q-emuLator and on the
+   NanoQL core (2026-10-04): fine. **Still to do in M3**: the enemy
+   gliders (dart, wedge, kite meshes; AI on the flight model; their
+   shots; a per-beat shot test, since they move; glider-vs-craft
+   bumps), the generators launching them, sound; the spawn point and
+   `test_keys` make scripted tests of each easy.
 4. **M4 sectors**: level tables (`tools/genlevel.py`), energy packs,
    the warp, three craft and the windshield crack, score, title and
    end screens.
