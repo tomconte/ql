@@ -100,21 +100,54 @@ GAME_MESHES = [
      [(0,0,-70),(0,0,70),(-42,0,0),(42,0,0),(0,-42,0),(0,42,0)],
      [[0,2,4],[0,4,3],[0,3,5],[0,5,2],
       [1,4,2],[1,3,4],[1,5,3],[1,2,5]]),
+
+    # The enemy gliders (spec 6): nose along +z (the heading), skimming
+    # with the hull centre at gl_y (80) over the ground, just under the
+    # eye (128), so they are seen nearly edge-on: the shapes carry height.
+    ("dart", "red",                     # flat tetrahedron + dorsal point
+     [(0,8,80),(-56,8,-48),(56,8,-48),(0,-28,-40)],
+     [[0,2,1],[0,1,3],[0,3,2],[1,2,3]]),
+
+    ("wedge", "red",                    # pyramid on its side, nose forward
+     [(0,12,80),(-48,-20,-40),(48,-20,-40),(48,20,-40),(-48,20,-40)],
+     [[1,2,3,4],[0,2,1],[0,3,2],[0,4,3],[0,1,4]]),
+
+    ("kite", "red",                     # bipyramid on a kite outline
+     [(0,0,96),(64,0,0),(0,0,-48),(-64,0,0),(0,-32,8),(0,24,8)],
+     [[0,4,1],[1,4,2],[2,4,3],[3,4,0],
+      [0,1,5],[1,2,5],[2,3,5],[3,0,5]]),
+
+    ("gen", "white",                    # the generator crystal: a tall
+     [(0,-192,0),(0,192,0),             # bipyramid on its lower tip,
+      (96,0,0),(0,0,96),(-96,0,0),(0,0,-96)],   # 384 tall, radius 96
+     [[0,2,3],[0,3,4],[0,4,5],[0,5,2],
+      [1,3,2],[1,4,3],[1,5,4],[1,2,5]]),
 ]
 
 # Meshes shown on the radar (spec 5.4), their blips in the mesh's own
 # colour: hostiles red, generators white, energy packs green. Obstacles
 # (towers, blocks) are left off.
-GAME_ON_RADAR = {"mine"}
+GAME_ON_RADAR = {"mine", "dart", "wedge", "kite", "gen"}
 
 # Hits a mesh takes before it goes (spec 6); the rest are obstacles
 # that stop shots and are never destroyed.
-GAME_HP = {"mine": 1}
+GAME_HP = {"mine": 1, "dart": 1, "wedge": 2, "kite": 3, "gen": 5}
 
 # What touching a mesh does (spec 7): absent = an obstacle (the craft
 # bounces off, 1 shield); else the entity is consumed and the shield
-# changes by the value (a mine -2, an energy pack will be +2).
+# changes by the value (a mine -2, an energy pack will be +2). The
+# gliders' contacts are their own (GAME_MOVE).
 GAME_TOUCH = {"mine": -2}
+
+# Meshes that move (the enemy gliders): left out of the object stage's
+# lists for the static tests (shot casts, the craft's walls); their
+# own code tests them every beat.
+GAME_MOVE = {"dart", "wedge", "kite"}
+
+# The explosion burst of a mesh that can be destroyed (sparks.inc,
+# tools/gensparks.py: the pattern for its centre height).
+GAME_BURST = {"mine": "mine", "dart": "glider", "wedge": "glider",
+              "kite": "glider", "gen": "gen"}
 
 SHOW_RADIUS = 84        # parade: projection-safe bound (Z0=300, focal
                         # 256/170): the cube's 83 is proven on screen (x
@@ -279,7 +312,8 @@ def emit_game():
     print("; v/f/e/n offsets from meshes, ybase (centre to lowest point),")
     print("; mesh radius, collision radius (x/z extent), radar blip colour")
     print("; (0 = not on the radar), hits to destroy (0 = an obstacle),")
-    print("; contact (0 = an obstacle, else consumed: shield += it), pad")
+    print("; contact (0 = an obstacle, else consumed: shield += it), moving")
+    print("; (1 = an enemy glider), explosion burst (offset from sparks)")
     print(f"nobjs       equ     {len(out_meshes)}")
     for i, m in enumerate(out_meshes):
         print(f"msh_{m[0]:<8}equ     {i}")
@@ -293,7 +327,9 @@ def emit_game():
               f"m_{name}_e-meshes,m_{name}_n-meshes")
         blip = COLOURS[colour] if name in GAME_ON_RADAR else 0
         print(f"        dc.w    {ybase},{radius},{colrad},{blip}")
-        print(f"        dc.w    {GAME_HP.get(name, 0)},{GAME_TOUCH.get(name, 0)},0,0")
+        burst = f"spk_{GAME_BURST[name]}-sparks" if name in GAME_BURST else "0"
+        print(f"        dc.w    {GAME_HP.get(name, 0)},{GAME_TOUCH.get(name, 0)},"
+              f"{1 if name in GAME_MOVE else 0},{burst}")
 
 if "--game" in sys.argv[1:]:
     emit_game()

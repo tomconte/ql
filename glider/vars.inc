@@ -74,12 +74,21 @@ bbox0:  dc.w    0
 bbox1:  dc.w    0
         ds.w    maxobj*4
 
-; player shots (sh_* offsets), the autofire cooldown, the gun port
-; toggle
+; player shots (sh_* offsets), then the enemy shots right after them
+; (shots_draw walks both), the shots in flight, the autofire cooldown,
+; the gun port toggle
 shots:  ds.b    nshots*sh_size
-nlive:  dc.w    0                   ; shots in flight
+eshots: ds.b    neshots*sh_size
+nlive:  dc.w    0                   ; player shots in flight
+nelive: dc.w    0                   ; enemy shots in flight
 fire_t: dc.w    0
 gun_lr: dc.w    0
+; enemy gliders (g_* offsets), each paired at startup with an entity
+; after the level's in entpool; the think phase of the next launch (1 or
+; 2, alternating, so gliders launched together think on different beats)
+glpool: ds.b    ngl*g_size
+gl_phase:
+        dc.w    1
 ; near: the entities inside the world box (the object stage, each
 ; frame), for the shots' hit tests; close: those within r_close, for
 ; the craft's; each a count, then pointers
@@ -93,6 +102,8 @@ nbooms: dc.w    0
 boom_mir:
         dc.w    0
 shield: dc.w    shield_max
+shield_chg:
+        dc.w    0                   ; nonzero: the shield changed this frame
 hurt_t: dc.w    0                   ; beats since a hit, counting down
 
 ; entity pool (e_* offsets), filled from the level table at start

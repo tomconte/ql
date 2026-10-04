@@ -2,39 +2,69 @@
 ; tools/gensparks.py precomputes (sparks.inc). Included by glider.asm.
 
 ; ---------------------------------------------------------------- boom add
-; boom_add: an explosion where an entity has just gone (spec 5.6), in
-; its mesh's colour, the burst mirrored on every other one for variety.
-; With all nboom records busy the first is reused.
+; boom_add: an explosion where an entity has just gone (spec 5.6): its
+; mesh's burst (od_spk: one per centre height) in its colour.
 ; In:      a5 = the entity
 ; Out:     booms, nbooms, boom_mir
 ; Trashes: d0, a3
 boom_add:
         move.l  a0,-(sp)
+        move.w  e_mesh(a5),d0
+        lsl.w   #5,d0
+        lea     objdir(pc),a0
+        move.w  od_spk(a0,d0.w),d0
+        lea     sparks(pc),a0
+        adda.w  d0,a0
+        bsr.s   boom_put
+        move.l  (sp)+,a0
+        rts
+
+; ---------------------------------------------------------------- boom hit
+; boom_hit: a puff of 4 sparks where a shot hit an entity without
+; destroying it (spec 5.6), in its colour.
+; In:      a5 = the entity
+; Out:     booms, nbooms, boom_mir
+; Trashes: d0, a3
+boom_hit:
+        move.l  a0,-(sp)
+        lea     spk_hit(pc),a0
+        bsr.s   boom_put
+        move.l  (sp)+,a0
+        rts
+
+; ---------------------------------------------------------------- boom put
+; boom_put: an explosion record for the entity with burst a0, at its
+; centre in its mesh's colour, mirrored on every other one for variety.
+; With all nboom records busy the first is reused.
+; In:      a0 = the burst (sparks.inc), a5 = the entity
+; Out:     booms, nbooms, boom_mir
+; Trashes: d0, a3
+boom_put:
+        move.l  a1,-(sp)
         lea     booms(pc),a3
-        lea     nboom*bm_size(a3),a0
+        lea     nboom*bm_size(a3),a1
 .f:     tst.w   bm_live(a3)
         beq.s   .got
         lea     bm_size(a3),a3
-        cmpa.l  a0,a3
+        cmpa.l  a1,a3
         blo.s   .f
         lea     booms(pc),a3        ; all busy: the first goes
         bra.s   .set
-.got:   lea     nbooms(pc),a0
-        addq.w  #1,(a0)
+.got:   lea     nbooms(pc),a1
+        addq.w  #1,(a1)
 .set:   move.w  #spk_life,bm_live(a3)
         move.w  e_x(a5),bm_x(a3)
         move.w  e_z(a5),bm_z(a3)
         move.w  e_y(a5),bm_y(a3)
         move.w  e_mesh(a5),d0
         lsl.w   #5,d0
-        lea     objdir(pc),a0
-        move.w  od_col(a0,d0.w),bm_col(a3)
-        lea     spk_mine(pc),a0     ; the one burst so far
+        lea     objdir(pc),a1
+        move.w  od_col(a1,d0.w),bm_col(a3)
         move.l  a0,bm_pat(a3)
-        lea     boom_mir(pc),a0
-        not.w   (a0)
-        move.w  (a0),bm_mir(a3)
-        move.l  (sp)+,a0
+        lea     boom_mir(pc),a1
+        not.w   (a1)
+        move.w  (a1),bm_mir(a3)
+        move.l  (sp)+,a1
         rts
 
 ; --------------------------------------------------------------- boom draw
@@ -180,10 +210,12 @@ boom_draw:
         rts
 ; .fast: the row's sparks (a6 .. a2) in plane a3 at x = d4 + (ox*d2) >>
 ; 7, y = d5 + (oy*d3) >> 7, all on screen; recorded at (a1)+ when bset
-; turned the pixel on. No room for a whole row: nothing. Trashes d0,
-; d1, d6, a0.
-.fast:  move.l  a1,d0
-        add.l   #spk_n*4,d0
+; turned the pixel on. No room for a whole row (4 bytes a spark, its
+; pair 2): nothing. Trashes d0, d1, d6, a0.
+.fast:  move.l  a2,d0
+        sub.l   a6,d0
+        add.l   d0,d0
+        add.l   a1,d0
         cmp.l   dl_end(pc),d0
         bhi.s   .fx                 ; the list is full
         move.l  a6,a0
@@ -215,8 +247,10 @@ boom_draw:
         blo.s   .fs
 .fx:    rts
 ; .slw: .fast with the bounds: a spark outside the play area is skipped.
-.slw:   move.l  a1,d0
-        add.l   #spk_n*4,d0
+.slw:   move.l  a2,d0
+        sub.l   a6,d0
+        add.l   d0,d0
+        add.l   a1,d0
         cmp.l   dl_end(pc),d0
         bhi.s   .sx
         move.l  a6,a0

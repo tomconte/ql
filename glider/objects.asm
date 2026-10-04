@@ -10,8 +10,11 @@
 ; erase box per drawn object, and a frame-edge poll after it. An entity
 ; on the radar (od_blip) inside the world box gets its blip from the
 ; camera-space centre the culling computes anyway (.blip), whether
-; drawn or not. Across the stage a5 = entity; draw_line trashes a0/a1,
-; so a1 (cur) is reloaded after every line.
+; drawn or not. The static entities inside the world box are listed for
+; the shots and the craft's collisions (near, close); the moving ones
+; (od_move: the enemy gliders) are tested by their own code every beat.
+; Across the stage a5 = entity; draw_line trashes a0/a1, so a1 (cur) is
+; reloaded after every line.
 ; In:      d7 = back buffer index, a4 = back buffer base, the dot list
 ;          open (dots_open)
 ; Out:     this buffer's erase-box list rebuilt (sight_hit[d7]: one of
@@ -67,23 +70,32 @@ objects:
         neg.w   d1
 .bz:    cmp.w   #r_active,d1
         bge     .enext
+        move.w  e_mesh(a5),d3
+        lsl.w   #5,d3
+        lea     objdir(pc),a0
+        adda.w  d3,a0               ; a0 = directory entry
+        tst.w   od_move(a0)
+        ifne    no_gld
+        bne     .enext              ; (profiling: moving entities skipped)
+        endc
+        bne.s   .cam                ; moving: not in the static lists
         cmp.w   #r_close,d1         ; close: what craft_hit tests next
         bge.s   .far                ; frame (usually nothing)
         cmp.w   #r_close,d6
         bge.s   .far
-        lea     close(pc),a0
-        move.w  (a0),d1
-        addq.w  #1,(a0)
+        lea     close(pc),a1
+        move.w  (a1),d1
+        addq.w  #1,(a1)
         lsl.w   #2,d1
-        move.l  a5,2(a0,d1.w)
-.far:   lea     near(pc),a0         ; near: what the shots test next frame
-        move.w  (a0),d1
-        addq.w  #1,(a0)
+        move.l  a5,2(a1,d1.w)
+.far:   lea     near(pc),a1         ; near: what the shots test next frame
+        move.w  (a1),d1
+        addq.w  #1,(a1)
         lsl.w   #2,d1
-        move.l  a5,2(a0,d1.w)
+        move.l  a5,2(a1,d1.w)
 ; --- centre into camera space (spec 5.1):
 ;   xc = (dx*c - dz*s) >> 8,  zc = (dz*c + dx*s) >> 8,  yc = cam_h - e_y
-        move.w  ocam+oc_s(pc),d3
+.cam:   move.w  ocam+oc_s(pc),d3
         move.w  ocam+oc_c(pc),d4
         move.w  d0,d1
         muls.w  d4,d1               ; dx*c
@@ -97,10 +109,6 @@ objects:
         asr.l   #8,d2               ; zc
         move.w  #cam_h,d3
         sub.w   e_y(a5),d3          ; yc (y down: the eye is above the ground)
-        move.w  e_mesh(a5),d0
-        lsl.w   #5,d0
-        lea     objdir(pc),a0
-        adda.w  d0,a0               ; a0 = directory entry
         ifeq    no_rad
         tst.w   od_blip(a0)
         beq.s   .nob

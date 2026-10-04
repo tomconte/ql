@@ -62,7 +62,8 @@ maxdots     equ     128             ; lattice dots per buffer (checked per
                                     ; row: a row of slack follows)
 rad_dots    equ     64              ; radar sweep + blip dots per buffer
                                     ; (the sweep takes up to rad_swmax)
-spk_dots    equ     64              ; explosion sparks per buffer
+spk_dots    equ     96              ; explosion sparks per buffer (a
+                                    ; generator's 32 and two gliders' 16)
 dl_recs     equ     maxdots+2*nwin+1+rad_dots+spk_dots ; dot list records
 
 ; ----- objects (spec sections 5.1, 5.2, 6). The near plane for meshes
@@ -126,8 +127,8 @@ sb_x        equ     16              ; the shield bar: x (a multiple of 8),
 sb_y        equ     8               ; first row (6 rows)
 
 ; ----- explosions (spec 5.6): up to nboom at once, each a burst from
-; sparks.inc (tools/gensparks.py: spk_n sparks for spk_life beats)
-nboom       equ     4
+; sparks.inc (tools/gensparks.py: up to spk_n sparks for spk_life beats)
+nboom       equ     6               ; (the puffs of hits take them too)
 
 ; ----- player shots (spec 7): up to nshots in flight, one every fire_cd
 ; beats while Space is held, shot_v units a beat for shot_life beats
@@ -143,6 +144,31 @@ gun_dx      equ     44
 gun_dy      equ     48
 shot_ym     equ     gun_dy*yfocal*16/xfocal ; sy = horizon + (invtab*it)>>16
 
+; ----- enemy gliders (spec 6): up to ngl at once (the global cap: the
+; budget knob), their entities in the pool after the level's. Each flies
+; the section-4 model with its type's constants and an AI that thinks
+; every gt_think beats (types.inc); the hull's centre skims at gl_y,
+; the gun ports' height, so their shots leave from it. First values
+; (2026-10-04), from a scratchpad model of the AI against a scripted
+; player: a static player is hit by most shots, a weaving one by few.
+ngl         equ     4
+gl_y        equ     cam_h-gun_dy    ; 80 over the ground
+gl_wait     equ     50              ; beats before a new glider's first shot
+deadw       equ     16              ; steering deadband: aim error across
+firew       equ     40              ; fire when the player is this close
+                                    ; across the nose (craft_r 32 + slack)
+orbit_b     equ     50              ; the wedge: beats orbiting at its range,
+attack_b    equ     110             ;   then beats turning in to fire
+orbit_m     equ     200             ; the orbit holds inside hold + this
+; enemy shots (spec 7): up to neshots in flight, eshot_v units a beat for
+; eshot_life beats (range 1800), launched eshot_nose ahead of the hull
+; centre; slow enough to see and slide out of
+neshots     equ     4
+eshot_v     equ     40
+eshot_life  equ     45
+eshot_nose  equ     64
+eshot_len   equ     48              ; drawn length
+
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
 ; 248-252, headroom bar 254-255
 hb_y        equ     254             ; bar top line (2 rows tall)
@@ -156,6 +182,10 @@ no_lat      equ     0               ; skip the lattice (erase still runs)
 no_hud      equ     0               ; skip the flight readouts
 no_obj      equ     0               ; skip the objects (box erase still runs)
 no_rad      equ     0               ; skip the radar's sweep and blips
+no_gls      equ     0               ; skip the gliders' and their shots'
+                                    ; beats (the gliders freeze)
+no_gld      equ     0               ; skip the moving entities (gliders) in
+                                    ; the object stage (not drawn, no blip)
 ; the spawn point (M4: per sector): between four lattice points, looking
 ; along +z. Moved for unattended tests, e.g. in front of a tower.
 spawn_x     equ     latd/2
@@ -165,6 +195,9 @@ spawn_head  equ     0               ; 8.8 brads
 ; under make shot (qlshot cannot press keys): e.g. 1<<k1__right pivots
 ; the craft so every object sweeps across the screen. 0 in a real build.
 test_keys   equ     0
+; test_gl: launch a dart, a wedge and a kite ahead of the spawn at start
+; (gl_test in enemy.asm), until the generators launch them
+test_gl     equ     1
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x, 0..sector-1
@@ -205,7 +238,51 @@ sh_tz       equ     16
 sh_hit      equ     18              ; word, the life at which it hits sh_tgt
                                     ; (shot_cast), 0 = nothing on its path
 sh_tgt      equ     20              ; long, the entity it will hit
-sh_size     equ     24
+sh_v        equ     24              ; word, its speed (shot_v, eshot_v)
+sh_col      equ     26              ; word, draw_line colour
+sh_size     equ     28
+
+; enemy glider record (glpool; the flight state is the section-4 model's,
+; the position kept 16.16 so its integer part is a word)
+g_x         equ     0               ; long, 16.16 world x (integer word
+g_z         equ     4               ;   first), wrapped into the sector
+g_head      equ     8               ; word, 8.8 brads
+g_turn      equ     10              ; word, current turn rate (0 = released)
+g_vx        equ     12              ; word, 8.8 units/beat
+g_vz        equ     14
+g_s         equ     16              ; word, sin head (8.8)
+g_c         equ     18              ; word, cos head
+g_tx        equ     20              ; word, the thrust vector (8.8), kept
+g_tz        equ     22              ;   with the heading
+g_ent       equ     24              ; long, its entity (e_flags 0: free)
+g_type      equ     28              ; long, its type record (gt_*)
+g_gen       equ     32              ; long, the generator that launched it
+g_dir       equ     36              ; word, the AI's turn: -1 left, 0, +1 right
+g_thr       equ     38              ; word, nonzero: thrust
+g_think     equ     40              ; word, beats to the next think
+g_fire      equ     42              ; word, beats to the next shot
+g_mode      equ     44              ; word, the orbit/attack phase clock
+g_burst     equ     46              ; word, shots left in the burst
+g_crad      equ     48              ; word, its collision radius (od_crad)
+g_size      equ     50
+
+; enemy glider type record (types.inc)
+gt_mesh     equ     0               ; word, mesh directory index
+gt_thrust   equ     2               ; word, 8.8 units/beat per beat
+gt_tmin     equ     4               ; word, turn rate when a turn starts,
+gt_tramp    equ     6               ;   its rise per beat held, its cap
+gt_tmax     equ     8               ;   (8.8 brads/beat)
+gt_hold     equ     10              ; word, range inside which it coasts
+                                    ; (0 = always thrust)
+gt_swerve   equ     12              ; word, range inside which it aims
+gt_aimoff   equ     14              ;   gt_aimoff beside the player
+gt_frange   equ     16              ; word, range it fires from
+gt_fcd      equ     18              ; word, beats between shots (bursts)
+gt_burst    equ     20              ; word, shots per burst
+gt_bgap     equ     22              ; word, beats between a burst's shots
+gt_think    equ     24              ; word, beats between thinks
+gt_orbit    equ     26              ; word, nonzero: orbit at the hold range
+gt_size     equ     28
 
 ; explosion record (booms)
 bm_live     equ     0               ; word, beats left, 0 = free
@@ -241,6 +318,9 @@ od_blip     equ     22              ; radar blip colour (0 = not shown)
 od_hp       equ     24              ; hits to destroy (0 = an obstacle)
 od_touch    equ     26              ; contact: 0 = an obstacle (bounce),
                                     ; else consumed, shield += it (mine -2)
+od_move     equ     28              ; 1 = moves (an enemy glider): not in
+                                    ; the static lists (near, close)
+od_spk      equ     30              ; its explosion burst, from sparks
 
 ; camera block for the object stage (ocam)
 oc_px       equ     0               ; word, camera x, integer units (0..sector-1)

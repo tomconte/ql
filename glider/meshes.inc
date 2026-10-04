@@ -194,18 +194,223 @@ m_mine_n:
         dc.l    28000
         dc.w    -667,-667,-400
         dc.l    28000
+; ----- dart: V4 F4 E6
+m_dart_v:
+        dc.w    0,8,80
+        dc.w    -56,8,-48
+        dc.w    56,8,-48
+        dc.w    0,-28,-40
+m_dart_f:
+        dc.b    36,24,12
+        dc.b    24,36,0
+        dc.b    36,12,0
+        dc.b    12,24,0
+        even
+m_dart_e:
+        dc.b    0,12
+        dc.w    $0003
+        dc.b    0,24
+        dc.w    $0005
+        dc.b    0,36
+        dc.w    $0006
+        dc.b    12,24
+        dc.w    $0009
+        dc.b    12,36
+        dc.w    $000a
+        dc.b    24,36
+        dc.w    $000c
+m_dart_n:
+        dc.w    0,-222,-1000
+        dc.l    46216
+        dc.w    562,-820,246
+        dc.l    13104
+        dc.w    -562,-820,246
+        dc.l    13120
+        dc.w    0,1024,0
+        dc.l    8192
+; ----- wedge: V5 F5 E8
+m_wedge_v:
+        dc.w    0,12,80
+        dc.w    -48,-20,-40
+        dc.w    48,-20,-40
+        dc.w    48,20,-40
+        dc.w    -48,20,-40
+m_wedge_f:
+        dc.b    0,12,48
+        dc.b    0,48,36
+        dc.b    0,36,24
+        dc.b    0,24,12
+        dc.b    12,24,36
+        even
+m_wedge_e:
+        dc.b    0,12
+        dc.w    $0012
+        dc.b    0,24
+        dc.w    $0006
+        dc.b    0,36
+        dc.w    $000c
+        dc.b    0,48
+        dc.w    $0018
+        dc.b    12,24
+        dc.w    $0003
+        dc.b    12,48
+        dc.w    $0011
+        dc.b    24,36
+        dc.w    $0005
+        dc.b    36,48
+        dc.w    $0009
+m_wedge_n:
+        dc.w    -951,0,380
+        dc.l    30400
+        dc.w    0,1022,68
+        dc.l    17704
+        dc.w    951,0,380
+        dc.l    30400
+        dc.w    0,-989,264
+        dc.l    9252
+        dc.w    0,0,-1024
+        dc.l    40960
+; ----- kite: V6 F8 E12
+m_kite_v:
+        dc.w    0,0,96
+        dc.w    64,0,0
+        dc.w    0,0,-48
+        dc.w    -64,0,0
+        dc.w    0,-32,8
+        dc.w    0,24,8
+m_kite_f:
+        dc.b    60,0,36
+        dc.b    60,36,24
+        dc.b    60,24,12
+        dc.b    60,12,0
+        dc.b    0,48,36
+        dc.b    36,48,24
+        dc.b    24,48,12
+        dc.b    12,48,0
+        even
+m_kite_e:
+        dc.b    0,12
+        dc.w    $0011
+        dc.b    0,36
+        dc.w    $0088
+        dc.b    0,48
+        dc.w    $0009
+        dc.b    0,60
+        dc.w    $0090
+        dc.b    12,24
+        dc.w    $0022
+        dc.b    12,48
+        dc.w    $0003
+        dc.b    12,60
+        dc.w    $0030
+        dc.b    24,36
+        dc.w    $0044
+        dc.b    24,48
+        dc.w    $0006
+        dc.b    24,60
+        dc.w    $0060
+        dc.b    36,48
+        dc.w    $000c
+        dc.b    36,60
+        dc.w    $00c0
+m_kite_n:
+        dc.w    -376,919,251
+        dc.l    24064
+        dc.w    -290,903,-387
+        dc.l    18576
+        dc.w    290,903,-387
+        dc.l    18576
+        dc.w    376,919,251
+        dc.l    24064
+        dc.w    -467,-856,311
+        dc.l    29856
+        dc.w    -357,-833,-476
+        dc.l    22848
+        dc.w    357,-833,-476
+        dc.l    22848
+        dc.w    467,-856,311
+        dc.l    29888
+; ----- gen: V6 F8 E12
+m_gen_v:
+        dc.w    0,-192,0
+        dc.w    0,192,0
+        dc.w    96,0,0
+        dc.w    0,0,96
+        dc.w    -96,0,0
+        dc.w    0,0,-96
+m_gen_f:
+        dc.b    60,24,12
+        dc.b    48,60,12
+        dc.b    36,48,12
+        dc.b    24,36,12
+        dc.b    24,60,0
+        dc.b    60,48,0
+        dc.b    48,36,0
+        dc.b    36,24,0
+        even
+m_gen_e:
+        dc.b    0,24
+        dc.w    $0009
+        dc.b    0,36
+        dc.w    $0003
+        dc.b    0,48
+        dc.w    $0006
+        dc.b    0,60
+        dc.w    $000c
+        dc.b    12,24
+        dc.w    $0090
+        dc.b    12,36
+        dc.w    $0030
+        dc.b    12,48
+        dc.w    $0060
+        dc.b    12,60
+        dc.w    $00c0
+        dc.b    24,36
+        dc.w    $0011
+        dc.b    24,60
+        dc.w    $0088
+        dc.b    36,48
+        dc.w    $0022
+        dc.b    48,60
+        dc.w    $0044
+m_gen_n:
+        dc.w    683,341,-683
+        dc.l    65568
+        dc.w    -683,341,-683
+        dc.l    65568
+        dc.w    -683,341,683
+        dc.l    65568
+        dc.w    683,341,683
+        dc.l    65568
+        dc.w    683,-341,-683
+        dc.l    65568
+        dc.w    -683,-341,-683
+        dc.l    65568
+        dc.w    -683,-341,683
+        dc.l    65568
+        dc.w    683,-341,683
+        dc.l    65568
 ; directory, 32 bytes per object: nvtx-1, nfaces-1, nedges-1, colour,
 ; v/f/e/n offsets from meshes, ybase (centre to lowest point),
 ; mesh radius, collision radius (x/z extent), radar blip colour
 ; (0 = not on the radar), hits to destroy (0 = an obstacle),
-; contact (0 = an obstacle, else consumed: shield += it), pad
-nobjs       equ     3
+; contact (0 = an obstacle, else consumed: shield += it), moving
+; (1 = an enemy glider), explosion burst (offset from sparks)
+nobjs       equ     7
 msh_tower   equ     0
 yb_tower    equ     192
 msh_block   equ     1
 yb_block    equ     96
 msh_mine    equ     2
 yb_mine     equ     42
+msh_dart    equ     3
+yb_dart     equ     8
+msh_wedge   equ     4
+yb_wedge    equ     20
+msh_kite    equ     5
+yb_kite     equ     24
+msh_gen     equ     6
+yb_gen      equ     192
 objdir:
         dc.w    11,7,17,3    ; white
         dc.w    m_tower_v-meshes,m_tower_f-meshes,m_tower_e-meshes,m_tower_n-meshes
@@ -218,4 +423,20 @@ objdir:
         dc.w    5,7,11,1    ; red
         dc.w    m_mine_v-meshes,m_mine_f-meshes,m_mine_e-meshes,m_mine_n-meshes
         dc.w    42,70,70,1
-        dc.w    1,-2,0,0
+        dc.w    1,-2,0,spk_mine-sparks
+        dc.w    3,3,5,1    ; red
+        dc.w    m_dart_v-meshes,m_dart_f-meshes,m_dart_e-meshes,m_dart_n-meshes
+        dc.w    8,81,80,1
+        dc.w    1,0,1,spk_glider-sparks
+        dc.w    4,4,7,1    ; red
+        dc.w    m_wedge_v-meshes,m_wedge_f-meshes,m_wedge_e-meshes,m_wedge_n-meshes
+        dc.w    20,81,80,1
+        dc.w    2,0,1,spk_glider-sparks
+        dc.w    5,7,11,1    ; red
+        dc.w    m_kite_v-meshes,m_kite_f-meshes,m_kite_e-meshes,m_kite_n-meshes
+        dc.w    24,96,96,1
+        dc.w    3,0,1,spk_glider-sparks
+        dc.w    5,7,11,3    ; white
+        dc.w    m_gen_v-meshes,m_gen_f-meshes,m_gen_e-meshes,m_gen_n-meshes
+        dc.w    192,192,96,3
+        dc.w    5,0,0,spk_gen-sparks

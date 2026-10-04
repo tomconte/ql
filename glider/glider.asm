@@ -33,6 +33,8 @@
 ;   this file    job header, takeover, frame loop
 ;   flight.asm   flight_step, craft_reset
 ;   combat.asm   the craft's collisions and shield, the player's shots
+;   enemy.asm    the enemy gliders: AI, flight, bumps, launches; their
+;                shots
 ;   boom.asm     explosions: dot sparks from precomputed bursts
 ;   lattice.asm  the lattice stage, wedge records
 ;   objects.asm  the object stage
@@ -42,6 +44,7 @@
 ;   strip.asm    the sight, the radar (the top strip)
 ;   vars.inc     variables and scratch
 ;   level.inc    static entity table
+;   types.inc    the enemy glider types
 ;   then meshes.inc, sparks.inc and sin.inc (generated), the supervisor
 ;   stack, the
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
@@ -119,6 +122,19 @@ main:
         move.l  (a0)+,(a1)+
         tst.w   d0
         bpl.s   .lvl                ; copies the -1 terminator too
+        lea     -e_size(a1),a1      ; then the gliders' entities over it,
+        lea     glpool(pc),a0       ; free (e_flags 0), each paired with
+        moveq   #ngl-1,d0           ; its glider record
+.gle:   move.l  a1,g_ent(a0)
+        move.w  #msh_dart,e_mesh(a1)
+        clr.w   e_flags(a1)
+        lea     e_size(a1),a1
+        lea     g_size(a0),a0
+        dbf     d0,.gle
+        move.w  #-1,e_mesh(a1)      ; the pool's end
+        ifne    test_gl
+        bsr     gl_test             ; a dart, a wedge, a kite ahead
+        endc
 
         lea     scr0,a4             ; the radar's static frame, both buffers
         bsr     radar_frame
@@ -176,7 +192,8 @@ frame_loop:
 
 ; ----- simulation: one step per beat of the previous loop (1..3), so
 ; everything stays defined per 20 ms whatever the frame rate (spec 2.1):
-; the flight model, the craft's collisions, the shots
+; the flight model, the craft's collisions, the shots, the enemy
+; gliders and their shots; then what a changed shield means
         move.w  headroom+16(pc),d6
         subq.w  #1,d6
 .beat:  lea     craft(pc),a0
@@ -184,7 +201,12 @@ frame_loop:
         bsr     flight_step
         bsr     craft_hit           ; walls, mines, the shield (spec 7)
         bsr     shots_step          ; fire, move, hit (spec 7)
+        ifeq    no_gls
+        bsr     gliders_step        ; AI, flight, bumps (spec 6)
+        bsr     eshots_step         ; their shots (spec 7)
+        endc
         dbf     d6,.beat
+        bsr     shield_check        ; the bar, or the next craft at zero
 
         ifeq    no_lat
         bsr     lattice             ; ground dots (spec 5.3)
@@ -274,6 +296,7 @@ frame_loop:
 
         include "flight.asm"
         include "combat.asm"
+        include "enemy.asm"
         include "boom.asm"
         include "lattice.asm"
         include "objects.asm"
@@ -282,6 +305,7 @@ frame_loop:
         include "strip.asm"
         include "vars.inc"
         include "level.inc"
+        include "types.inc"
 
         include "meshes.inc"
         include "sparks.inc"

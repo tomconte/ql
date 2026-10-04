@@ -14,12 +14,12 @@
 ; stays inside). A bump -- at least bump_v along the normal -- costs 1
 ; shield unless a hit in the last hurt_b beats already did; leaning on
 ; a wall with thrust held costs nothing (it drained 2 a second). A loss
-; turns the sight red for flash_b beats; at zero the craft starts over
-; with a full shield (a stand-in for M4's windshield crack and spare
-; craft). The shield bar is redrawn when the value changed.
+; turns the sight red for flash_b beats; what a changed shield means is
+; decided after the simulation (shield_check). The enemy gliders' own
+; contacts are theirs (glider_bump): they are not in close.
 ; In:      none
-; Out:     craft (position, velocity; reset at zero shield), shield,
-;          hurt_t, sight_col, the shield bar, entities consumed (e_flags)
+; Out:     craft (position, velocity), shield, shield_chg, hurt_t,
+;          sight_col, entities consumed (e_flags), booms
 ; Trashes: d0-d4, a0-a3, a5, a6
 craft_hit:
         lea     craft(pc),a0
@@ -37,7 +37,6 @@ craft_hit:
         lea     close(pc),a2
         move.w  (a2)+,d0
         beq     .done               ; nothing near: the usual case
-        move.w  shield(pc),-(sp)    ; to see a change at the end
         lsl.w   #2,d0
         lea     (a2,d0.w),a3
         move.l  a3,-(sp)            ; end of the list
@@ -138,22 +137,34 @@ craft_hit:
 .cn:    cmpa.l  (sp),a2
         blo     .cl
 .end:   addq.l  #4,sp
-        move.w  (sp)+,d0
-        cmp.w   shield(pc),d0
-        beq.s   .done               ; unchanged
+.done:  rts
+
+; ------------------------------------------------------------- shield check
+; shield_check: after the simulation's beats, act on a shield that
+; changed (shield_add marked it): at zero or less the craft starts over
+; at the spawn with a full shield (a stand-in for M4's windshield crack
+; and the next craft), else its bar is redrawn.
+; In:      none
+; Out:     shield_chg cleared; the shield bar; or craft, shield, hurt_t,
+;          sight_col reset
+; Trashes: d0-d4, a0, a1
+shield_check:
+        lea     shield_chg(pc),a0
+        tst.w   (a0)
+        beq.s   .done
+        clr.w   (a0)
         move.w  shield(pc),d0
-        bgt.s   .alive
-        bsr     craft_reset         ; zero: start over (M4: the crack,
-        bra     shield_reset        ; the next craft); tail call
-.alive: bra     shield_bar          ; tail call
+        bgt     shield_bar          ; tail call
+        bsr     craft_reset
+        bra     shield_reset        ; tail call
 .done:  rts
 
 ; --------------------------------------------------------------- shield add
 ; shield_add: the shield changes by d2.w (signed, capped at shield_max;
-; craft_hit deals with zero); a loss starts the hurt timer and turns the
-; sight red.
+; shield_check deals with zero), marked for shield_check; a loss starts
+; the hurt timer and turns the sight red.
 ; In:      d2.w = the change
-; Out:     shield, hurt_t, sight_col
+; Out:     shield, shield_chg, hurt_t, sight_col
 ; Trashes: a3
 shield_add:
         lea     shield(pc),a3
@@ -161,7 +172,9 @@ shield_add:
         cmp.w   #shield_max,(a3)
         ble.s   .s1
         move.w  #shield_max,(a3)
-.s1:    tst.w   d2
+.s1:    lea     shield_chg(pc),a3
+        move.w  #1,(a3)
+        tst.w   d2
         bpl.s   .s2
         lea     hurt_t(pc),a3
         move.w  #hurt_b,(a3)
@@ -189,16 +202,19 @@ shield_reset:
 ; the cooldown over, a free shot leaves the next gun port (alternately
 ; gun_dx either side of the eye) along the heading at shot_v units a
 ; beat, and shot_cast finds its target. Then every live shot ages and
-; moves, and hits when its countdown says so: the world is static, so a
-; shot's first hit is known at launch (testing every shot against every
-; nearby entity each beat cost ~8 ms a frame). A hit stops the shot; an
-; entity whose mesh has od_hp takes it (e_hp) and goes (e_flags = 0) at
-; od_hp hits, the rest are obstacles. A target gone meanwhile (another
-; shot got it) means a new cast from where the shot is. With none in
-; flight and Space up it returns at once. (The sight's blink while shots
-; flew, spec v0.2, was dropped on 2026-09-30: it annoyed in play.)
+; moves, and hits a glider its head swept this beat (shot_gl: they move,
+; so they are tested every beat), or the static entity its countdown
+; says: the static world's first hit is known at launch (testing every
+; shot against every nearby entity each beat cost ~8 ms a frame). A hit
+; stops the shot; an entity whose mesh has od_hp takes it (e_hp, a puff
+; of sparks) and goes (e_flags = 0, an explosion) at od_hp hits, the
+; rest are obstacles. A target gone meanwhile (another shot got it)
+; means a new cast from where the shot is. With none in flight and Space
+; up it returns at once. (The sight's blink while shots flew, spec v0.2,
+; was dropped on 2026-09-30: it annoyed in play.)
 ; In:      d5.b = held keys (row-1 bits)
-; Out:     shots, nlive, fire_t, gun_lr; entities hit (e_hp, e_flags)
+; Out:     shots, nlive, fire_t, gun_lr; entities hit (e_hp, e_flags),
+;          booms
 ; Trashes: d0-d4, a0-a3, a5
 shots_step:
         lea     fire_t(pc),a2
@@ -261,6 +277,8 @@ shots_step:
         sub.w   d1,d0
         move.w  d0,sh_z(a1)
         move.w  #shot_life,sh_life(a1)
+        move.w  #shot_v,sh_v(a1)
+        move.w  #col_green,sh_col(a1)
         bsr     shot_cast
 ; --- every live shot: age, move, hit when the countdown says so
 .move:  lea     shots(pc),a1
@@ -273,6 +291,8 @@ shots_step:
         add.w   d0,sh_x(a1)
         move.w  sh_vz(a1),d0
         add.w   d0,sh_z(a1)
+        bsr     shot_gl             ; a glider in this beat's sweep?
+        bcs.s   .hit
         move.w  sh_life(a1),d0
         cmp.w   sh_hit(a1),d0
         bne.s   .fly                ; not there yet (or no target)
@@ -289,9 +309,11 @@ shots_step:
         beq.s   .snext              ; an obstacle
         addq.w  #1,e_hp(a5)
         cmp.w   e_hp(a5),d0
-        bgt.s   .snext
+        bgt.s   .puff
         clr.w   e_flags(a5)         ; destroyed
         bsr     boom_add
+        bra.s   .snext
+.puff:  bsr     boom_hit            ; hit, not yet destroyed
         bra.s   .snext
 .fly:   addq.w  #1,d4
 .snext: lea     sh_size(a1),a1
@@ -308,10 +330,11 @@ shots_step:
 ; shot's whole path stays inside it) is taken into the shot's frame,
 ;   across = (wx*c - wz*s) >> 8,  along = (wx*s + wz*c) >> 8
 ; and the path enters its collision circle at about along - r (exact
-; head-on, up to r early for a grazing pass; beats are shot_v = 80 units
-; anyway). The nearest entry gives the beat j >= 1 the head reaches it,
-; stored as the life the shot will have then (sh_hit = life - j, or 0 if
-; it burns out first) with the entity (sh_tgt).
+; head-on, up to r early for a grazing pass; beats are sh_v = 40..80
+; units anyway). The nearest entry gives the beat j >= 1 the head
+; reaches it, stored as the life the shot will have then (sh_hit = life
+; - j, or 0 if it burns out first) with the entity (sh_tgt). The enemy
+; gliders are not in near: their hits are tested every beat.
 ; In:      a1 = the shot
 ; Out:     sh_hit, sh_tgt of the shot
 ; Trashes: d0-d3, a0, a3, a5
@@ -371,8 +394,11 @@ shot_cast:
         move.w  d3,d0               ; the beat j the head gets there:
         ble.s   .j1                 ; already in: the next one
         ext.l   d0
-        add.l   #shot_v-1,d0
-        divu.w  #shot_v,d0          ; j = ceil(entry / shot_v)
+        moveq   #0,d1
+        move.w  sh_v(a1),d1
+        add.l   d1,d0
+        subq.l  #1,d0
+        divu.w  d1,d0               ; j = ceil(entry / sh_v)
         bra.s   .jj
 .j1:    moveq   #1,d0
 .jj:    move.w  sh_life(a1),d1
@@ -381,9 +407,73 @@ shot_cast:
         move.w  d1,sh_hit(a1)
 .none:  rts
 
+; ----------------------------------------------------------------- shot gl
+; shot_gl: the live glider, if any, the shot's head swept this beat: per
+; glider a box reject (a beat's sweep plus its radius), then in the
+; shot's frame, with w = glider - head,
+;   across = (wx*c - wz*s) >> 8,  along = (wx*s + wz*c) >> 8,
+; a hit when |across| < g_crad and the centre lies between the head's
+; last position and g_crad ahead of it (a box for the capsule: a little
+; generous at the corners). The first glider found is the one hit.
+; In:      a1 = the shot, moved this beat
+; Out:     carry set: a5 = the glider's entity; carry clear: none (a5
+;          changed); ccr
+; Trashes: d0-d3, a3
+shot_gl:
+        lea     glpool(pc),a3
+.gl:    move.l  g_ent(a3),a5
+        tst.w   e_flags(a5)
+        beq.s   .next               ; a free slot
+        move.w  g_crad(a3),d3
+        add.w   sh_v(a1),d3         ; the box's half-side
+        move.w  g_x(a3),d0
+        sub.w   sh_x(a1),d0
+        lsl.w   #16-sector_sh,d0
+        asr.w   #16-sector_sh,d0    ; wx (nearest image)
+        move.w  d0,d2
+        bpl.s   .x
+        neg.w   d2
+.x:     cmp.w   d3,d2
+        bge.s   .next
+        move.w  g_z(a3),d1
+        sub.w   sh_z(a1),d1
+        lsl.w   #16-sector_sh,d1
+        asr.w   #16-sector_sh,d1    ; wz
+        move.w  d1,d2
+        bpl.s   .z
+        neg.w   d2
+.z:     cmp.w   d3,d2
+        bge.s   .next
+        move.w  d0,d2
+        muls.w  sh_c(a1),d2         ; wx*c
+        move.w  d1,d3
+        muls.w  sh_s(a1),d3         ; wz*s
+        sub.l   d3,d2
+        asr.l   #8,d2               ; across
+        bpl.s   .a
+        neg.w   d2
+.a:     cmp.w   g_crad(a3),d2
+        bge.s   .next               ; beside its path
+        muls.w  sh_s(a1),d0         ; wx*s
+        muls.w  sh_c(a1),d1         ; wz*c
+        add.l   d1,d0
+        asr.l   #8,d0               ; along
+        cmp.w   g_crad(a3),d0
+        bgt.s   .next               ; still ahead of the head
+        add.w   sh_v(a1),d0
+        bmi.s   .next               ; behind where the head was
+        ori     #1,ccr              ; hit
+        rts
+.next:  lea     g_size(a3),a3
+        lea     glpool+ngl*g_size(pc),a5
+        cmpa.l  a5,a3
+        blo.s   .gl                 ; (falls out with the carry clear)
+        rts
+
 ; --------------------------------------------------------------- shots draw
-; shots_draw: every live shot as a green segment from its head to its
-; tail, gun_dy below the eye, with an erase box. Drawn only when both
+; shots_draw: every live shot as a segment from its head to its tail in
+; its colour (the player's green, the enemy's red), gun_dy below the eye
+; (the gliders' gl_y), with an erase box. Drawn only when both
 ; ends lie between the lattice's near and far planes inside the
 ; 90-degree view, so no clipping: a shot shows from its second beat or
 ; so, and burns out before zfar. The ends project through the lattice's
@@ -395,6 +485,7 @@ shot_cast:
 ; Trashes: d0-d6, a0-a3, a5, a6
 shots_draw:
         move.w  nlive(pc),d0        ; (no tst on pc-relative: 68020+)
+        add.w   nelive(pc),d0
         beq     .none
         lea     shots(pc),a5
 .sh:    tst.w   sh_life(a5)
@@ -430,11 +521,11 @@ shots_draw:
         move.w  d6,d1
         move.w  a2,d2
         move.w  a3,d3
-        moveq   #col_green,d4
+        move.w  sh_col(a5),d4
         bsr     draw_line
 .next:  lea     sh_size(a5),a5
-        lea     shots+nshots*sh_size(pc),a0
-        cmpa.l  a0,a5
+        lea     eshots+neshots*sh_size(pc),a0
+        cmpa.l  a0,a5               ; the player's, then the enemy's
         blo     .sh
 .none:  rts
 
