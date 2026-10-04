@@ -22,3 +22,4 @@ gt_kite:                            ; the gunship: slow (20 units a beat),
         dc.w    64,6,256
         dc.w    1100,0,0
         dc.w    1500,90,3,6,2,0
+gltypes_e:

@@ -302,7 +302,10 @@ shots_step:
         bsr     shot_cast           ; the target went: what is behind it?
         bra.s   .fly                ; (at least a beat away)
 .hit:   clr.w   sh_life(a1)         ; the shot stops
-        move.w  e_mesh(a5),d0
+        cmp.w   #msh_gen,e_mesh(a5)
+        bne.s   .ngen
+        bsr     gen_alert           ; a generator: its gliders attack
+.ngen:  move.w  e_mesh(a5),d0
         lsl.w   #5,d0
         lea     objdir(pc),a0
         move.w  od_hp(a0,d0.w),d0

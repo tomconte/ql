@@ -56,6 +56,8 @@ headroom:
         dc.w    $7fff               ; +28 window: min spins
         dc.w    0                   ; +30 window: max spins
         dc.w    0,0,0,0             ; +32 latched avg0, avg1, min, max
+        dc.l    0                   ; +40 beats since the start (tests:
+                                    ;   against the wall clock)
 
 ; per-buffer dot lists: count, then (byte offset, inverse mask) records:
 ; the lattice's (maxdots, checked per row, so a row of slack follows),
@@ -89,6 +91,11 @@ gun_lr: dc.w    0
 glpool: ds.b    ngl*g_size
 gl_phase:
         dc.w    1
+gl_next:
+        dc.w    0                   ; the type the next launch takes
+; the generators (their entities), listed at startup: count, pointers
+gens:   dc.w    0
+        ds.l    ngen
 ; near: the entities inside the world box (the object stage, each
 ; frame), for the shots' hit tests; close: those within r_close, for
 ; the craft's; each a count, then pointers

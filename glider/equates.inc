@@ -160,6 +160,16 @@ firew       equ     40              ; fire when the player is this close
 orbit_b     equ     50              ; the wedge: beats orbiting at its range,
 attack_b    equ     110             ;   then beats turning in to fire
 orbit_m     equ     200             ; the orbit holds inside hold + this
+alert_r     equ     1800            ; a patrolling glider attacks inside this
+lose_r      equ     3500            ; an attacking one gives up beyond this
+patrol_r    equ     600             ; the patrol wheels round inside this
+; generators (spec 6): each launches up to gen_own gliders of its own
+; (under the ngl cap), one every gen_delay beats, the types in turn; it
+; turns gen_spin a beat. At most ngen per sector.
+ngen        equ     8
+gen_own     equ     2
+gen_delay   equ     500             ; 10 s
+gen_spin    equ     64              ; 0.25 brad a beat: a turn in 20 s
 ; enemy shots (spec 7): up to neshots in flight, eshot_v units a beat for
 ; eshot_life beats (range 1800), launched eshot_nose ahead of the hull
 ; centre; slow enough to see and slide out of
@@ -197,7 +207,7 @@ spawn_head  equ     0               ; 8.8 brads
 test_keys   equ     0
 ; test_gl: launch a dart, a wedge and a kite ahead of the spawn at start
 ; (gl_test in enemy.asm), until the generators launch them
-test_gl     equ     1
+test_gl     equ     0
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x, 0..sector-1
@@ -264,7 +274,9 @@ g_fire      equ     42              ; word, beats to the next shot
 g_mode      equ     44              ; word, the orbit/attack phase clock
 g_burst     equ     46              ; word, shots left in the burst
 g_crad      equ     48              ; word, its collision radius (od_crad)
-g_size      equ     50
+g_alert     equ     50              ; word, nonzero: attacking (else on
+                                    ; patrol round its generator)
+g_size      equ     52
 
 ; enemy glider type record (types.inc)
 gt_mesh     equ     0               ; word, mesh directory index

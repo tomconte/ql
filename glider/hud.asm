@@ -139,7 +139,8 @@ draw_hbar:
 ; its idle spins and extra beats, spins per back buffer, min and max;
 ; every mwin loops latch the window into the meter fields and have
 ; draw_meters draw them into both buffers. Also stores the loop's beats
-; (headroom+16), which the next loop's simulation steps.
+; (headroom+16), which the next loop's simulation steps, and adds them
+; to the total (headroom+40).
 ; In:      d0.l = idle spins of the VBL wait, d1.w = extra beats (0..2),
 ;          d7 = back buffer index
 ; Out:     the headroom block updated
@@ -162,6 +163,8 @@ meter_acc:
         move.w  d0,30(a2)
 .nmax:  addq.w  #1,d1
         move.w  d1,16(a2)           ; beats for the next sim step
+        ext.l   d1
+        add.l   d1,40(a2)           ; the total
         subq.w  #1,10(a2)           ; loops left in the window
         bne.s   .done
         move.w  #mwin,10(a2)

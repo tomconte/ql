@@ -38,9 +38,10 @@ bbox_sel:
 ; has its own prebuilt row loop, picked per box by two bits of the row
 ; stride. No self-modifying code (spec 2.1): the first version patched
 ; the remainder's movem mask per box, which a 68020's instruction cache
-; would not see.
+; would not see. The frame edge is polled after every box: a dozen
+; large boxes take longer than a beat.
 ; In:      d7 = back buffer index, a4 = back buffer base
-; Out:     none
+; Out:     xbeats (frame edges polled)
 ; Trashes: d0-d6, a0-a3, a5, a6
 erase_boxes:
         bsr     bbox_sel            ; a6 = this buffer's box list
@@ -114,7 +115,8 @@ erase_boxes:
         adda.w  d4,a0
         subq.w  #1,d2
         bne.s   .r6
-.bnext: cmpa.l  (sp),a6
+.bnext: beat_poll
+        cmpa.l  (sp),a6
         blo     .ebox
         addq.l  #4,sp
 .noeb:  rts

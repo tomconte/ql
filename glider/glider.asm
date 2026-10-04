@@ -132,6 +132,21 @@ main:
         lea     g_size(a0),a0
         dbf     d0,.gle
         move.w  #-1,e_mesh(a1)      ; the pool's end
+        lea     entpool(pc),a0      ; the generators, listed for gen_step
+        lea     gens+2(pc),a1
+        moveq   #0,d1
+.gsc:   move.w  e_mesh(a0),d0
+        bmi.s   .gsd
+        cmp.w   #msh_gen,d0
+        bne.s   .gsn
+        cmp.w   #ngen,d1
+        bhs.s   .gsn                ; (more than ngen: the rest stay idle)
+        move.l  a0,(a1)+
+        addq.w  #1,d1
+.gsn:   lea     e_size(a0),a0
+        bra.s   .gsc
+.gsd:   lea     gens(pc),a0
+        move.w  d1,(a0)
         ifne    test_gl
         bsr     gl_test             ; a dart, a wedge, a kite ahead
         endc
@@ -167,10 +182,11 @@ frame_loop:
 
 ; ----- erase what this buffer held two frames ago: every erase runs
 ; before any draw, so overlapping boxes cost nothing
-        bsr     erase_boxes
+        bsr     erase_boxes         ; (polls the frame edge per box)
         bsr     erase_dots
         bsr     sight_erase         ; when its colour changes this frame
         bsr     dots_open           ; this frame's dot list, empty
+        beat_poll
 
 ; ----- input: the row-1 bits read at the end of the previous loop (the
 ; IPC read sits between the work and the VBL wait, see there)
@@ -205,8 +221,12 @@ frame_loop:
         bsr     gliders_step        ; AI, flight, bumps (spec 6)
         bsr     eshots_step         ; their shots (spec 7)
         endc
+        beat_poll
         dbf     d6,.beat
         bsr     shield_check        ; the bar, or the next craft at zero
+        ifeq    no_gls
+        bsr     gen_step            ; the generators turn and launch
+        endc
 
         ifeq    no_lat
         bsr     lattice             ; ground dots (spec 5.3)
@@ -230,6 +250,7 @@ frame_loop:
         ifeq    no_obj
         bsr     objects
         bsr     shots_draw          ; needs the object stage's ocam
+        beat_poll
         endc
 
 ; ----- sight: the four-corner bracket around the aim point (256,
@@ -242,6 +263,7 @@ frame_loop:
 ; never eats it (spec 5.6; they need the object stage's ocam)
         ifeq    no_obj
         bsr     boom_draw
+        beat_poll
         endc
 
 ; ----- top strip: the radar's sweep (its frame is static; the blips
@@ -252,7 +274,9 @@ frame_loop:
 
 ; ----- HUD readouts, headroom bar, meters, then VBL sync + flip. The
 ; frame edges consumed during the work (beat_poll at the stage
-; boundaries, plus one last poll here) are the loop's extra beats;
+; boundaries -- every stretch between two polls must stay under a beat,
+; or an edge is lost and the game runs slow -- plus one last poll here)
+; are the loop's extra beats;
 ; then wait for the next real edge (flips stay VBL-aligned) and consume
 ; that too so the next loop's count is honest.
         ifeq    no_hud

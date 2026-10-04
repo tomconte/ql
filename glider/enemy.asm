@@ -43,58 +43,51 @@ gliders_step:
         rts
 
 ; ------------------------------------------------------------- glider think
-; glider_think: the AI's decision for the next gt_think beats. The
-; player is taken into the glider's frame (forward = (s, c), right =
-; (c, -s), the vector to it wrapped to its nearest image),
-;   fwd = (dx*s + dz*c) >> 8,  rgt = (dx*c - dz*s) >> 8,
-; with the range ~ max(|dx|, |dz|) + min/2. The glider turns toward
-; the player until the aim error across is within deadw (inside
-; gt_swerve it aims gt_aimoff beside it instead, to pass: the dart),
-; and thrusts beyond gt_hold. A glider with gt_orbit, inside its range
-; + orbit_m for the first orbit_b beats of every orbit_b + attack_b,
-; holds the player abeam on its right at full thrust (the wedge circles
-; it, then turns in). It fires when the player is ahead within
-; gt_frange and within firew across its nose: gt_burst shots gt_bgap
-; beats apart, then gt_fcd beats of cooldown (all enemy shots in
-; flight: it tries again at the next think).
+; glider_think: the AI's decision for the next gt_think beats. A glider
+; launched by a generator patrols round it until the player comes
+; within alert_r or the generator is hit (gen_alert), then attacks until
+; the player is beyond lose_r with its generator still up. On patrol,
+; at full thrust, it heads back to the generator from beyond patrol_r
+; and inside it holds the generator abeam on its right: cloverleaf
+; loops all round it (a scratchpad model). Attacking, it turns toward the
+; player (gl_frame: fwd, rgt, range) until the aim error across is
+; within deadw (inside gt_swerve it aims gt_aimoff beside it instead,
+; to pass: the dart), and thrusts beyond gt_hold. A glider with
+; gt_orbit, inside its range + orbit_m for the first orbit_b beats of
+; every orbit_b + attack_b, holds the player abeam on its right at full
+; thrust (the wedge circles it, then turns in). It fires when the
+; player is ahead within gt_frange and within firew across its nose:
+; gt_burst shots gt_bgap beats apart, then gt_fcd beats of cooldown
+; (all enemy shots in flight: it tries again at the next think).
 ; In:      a0 = the glider, a2 = its type
-; Out:     g_dir, g_thr, g_fire, g_burst; an enemy shot fired (eshots,
-;          nelive)
+; Out:     g_dir, g_thr, g_alert, g_fire, g_burst; an enemy shot fired
+;          (eshots, nelive)
 ; Trashes: d0-d4, a1, a3
 glider_think:
         move.l  craft+c_px(pc),d0
         lsr.l   #8,d0
-        sub.w   g_x(a0),d0
-        lsl.w   #16-sector_sh,d0
-        asr.w   #16-sector_sh,d0    ; dx = player - glider (nearest image)
+        sub.w   g_x(a0),d0          ; dx = player - glider
         move.l  craft+c_pz(pc),d1
         lsr.l   #8,d1
-        sub.w   g_z(a0),d1
-        lsl.w   #16-sector_sh,d1
-        asr.w   #16-sector_sh,d1    ; dz
-        move.w  d0,d3               ; the range: max + min/2
-        bpl.s   .ax
-        neg.w   d3
-.ax:    move.w  d1,d4
-        bpl.s   .az
-        neg.w   d4
-.az:    cmp.w   d4,d3
-        bhs.s   .mx
-        exg     d3,d4
-.mx:    lsr.w   #1,d4
-        add.w   d4,d3               ; d3 = range
-        move.w  d0,d2
-        muls.w  g_s(a0),d2          ; dx*s
-        move.w  d1,d4
-        muls.w  g_c(a0),d4          ; dz*c
-        add.l   d4,d2
-        asr.l   #8,d2               ; d2 = fwd
-        muls.w  g_c(a0),d0          ; dx*c
-        muls.w  g_s(a0),d1          ; dz*s
-        sub.l   d1,d0
-        asr.l   #8,d0               ; d0 = rgt
-; --- steering: the orbit phase, else seek
-        tst.w   gt_orbit(a2)
+        sub.w   g_z(a0),d1          ; dz
+        bsr     gl_frame            ; d0 = rgt, d2 = fwd, d3 = range
+        tst.w   g_alert(a0)
+        bne.s   .lose
+        cmp.w   #alert_r,d3
+        bhs     .patrol             ; the player is far: patrol
+        move.w  #1,g_alert(a0)      ; close: attack
+        bra.s   .att
+.lose:  cmp.w   #lose_r,d3
+        blo.s   .att
+        move.l  g_gen(a0),d4
+        beq.s   .att                ; no generator: keep at it
+        move.l  d4,a1
+        tst.w   e_flags(a1)
+        beq.s   .att                ; its generator is gone: keep at it
+        clr.w   g_alert(a0)         ; lost: back on patrol
+        bra     .patrol
+; --- attack: the orbit phase, else seek
+.att:   tst.w   gt_orbit(a2)
         beq.s   .seek
         cmp.w   #orbit_b,g_mode(a0)
         bhs.s   .seek               ; the attack phase
@@ -158,6 +151,64 @@ glider_think:
         beq.s   .done
         move.w  gt_bgap(a2),g_fire(a0)  ; the burst's next shot
 .done:  rts
+; --- patrol: round its generator
+.patrol:
+        move.l  g_gen(a0),a1
+        move.w  e_x(a1),d0
+        sub.w   g_x(a0),d0          ; to the generator
+        move.w  e_z(a1),d1
+        sub.w   g_z(a0),d1
+        bsr     gl_frame
+        move.w  #1,g_thr(a0)        ; at full thrust
+        moveq   #1,d4
+        cmp.w   #patrol_r,d3
+        blo.s   .pab
+        tst.w   d0                  ; beyond patrol_r: head back
+        bpl.s   .pd
+        moveq   #-1,d4
+        bra.s   .pd
+.pab:   tst.w   d2                  ; inside: the generator abeam on the
+        ble.s   .pd                 ; right (behind it: turn right,
+        moveq   #-1,d4              ; ahead: left)
+.pd:    move.w  d4,g_dir(a0)
+        rts
+
+; ----------------------------------------------------------------- gl frame
+; gl_frame: a vector from the glider (to the player, or to its
+; generator) wrapped to its nearest image, its range ~ max(|dx|, |dz|)
+; + min/2 (within 12%), and the vector in the glider's frame (forward
+; = (s, c), right = (c, -s)):
+;   fwd = (dx*s + dz*c) >> 8,  rgt = (dx*c - dz*s) >> 8
+; In:      d0.w = dx, d1.w = dz (16-bit differences), a0 = the glider
+; Out:     d0.w = rgt, d2.w = fwd, d3.w = range
+; Trashes: d1, d4
+gl_frame:
+        lsl.w   #16-sector_sh,d0
+        asr.w   #16-sector_sh,d0    ; dx (nearest image)
+        lsl.w   #16-sector_sh,d1
+        asr.w   #16-sector_sh,d1    ; dz
+        move.w  d0,d3               ; the range: max + min/2
+        bpl.s   .ax
+        neg.w   d3
+.ax:    move.w  d1,d4
+        bpl.s   .az
+        neg.w   d4
+.az:    cmp.w   d4,d3
+        bhs.s   .mx
+        exg     d3,d4
+.mx:    lsr.w   #1,d4
+        add.w   d4,d3               ; d3 = range
+        move.w  d0,d2
+        muls.w  g_s(a0),d2          ; dx*s
+        move.w  d1,d4
+        muls.w  g_c(a0),d4          ; dz*c
+        add.l   d4,d2
+        asr.l   #8,d2               ; d2 = fwd
+        muls.w  g_c(a0),d0          ; dx*c
+        muls.w  g_s(a0),d1          ; dz*s
+        sub.l   d1,d0
+        asr.l   #8,d0               ; d0 = rgt
+        rts
 
 ; --------------------------------------------------------------- glider fly
 ; glider_fly: one beat of the section-4 model with the type's constants
@@ -356,7 +407,8 @@ glider_bump:
 ; ------------------------------------------------------------ glider launch
 ; glider_launch: a glider of type a2 in the first free slot, at rest at
 ; (d0, d1) heading d2, its first shot gl_wait beats away, its think
-; phase alternating with the previous launch's.
+; phase alternating with the previous launch's; on patrol round the
+; generator that launched it, or attacking at once without one.
 ; In:      d0.w = x, d1.w = z (world units), d2.w = heading (8.8
 ;          brads), a2 = its type, a3 = the generator launching it (0:
 ;          none)
@@ -385,8 +437,11 @@ glider_launch:
         clr.w   g_vx(a0)
         clr.w   g_vz(a0)
         move.l  a2,g_type(a0)
+        clr.w   g_alert(a0)         ; patrol round its generator,
         move.l  a3,g_gen(a0)
-        clr.w   g_dir(a0)
+        bne.s   .home
+        move.w  #1,g_alert(a0)      ; or, with none, attack at once
+.home:  clr.w   g_dir(a0)
         clr.w   g_thr(a0)
         lea     gl_phase(pc),a1
         eori.w  #3,(a1)             ; 1, 2, 1, ...
@@ -550,6 +605,82 @@ eshots_step:
         lea     nelive(pc),a0
         move.w  d4,(a0)
 .none:  rts
+
+; ----------------------------------------------------------------- gen step
+; gen_step: the generators, once a frame by the beats of this loop's
+; simulation (spec 6): each live one turns gen_spin a beat, and when its
+; launch timer (e_tmr) has run out launches a glider from its centre
+; along its heading -- if fewer than gen_own of its own fly and a slot
+; is free (the ngl cap) -- the types in turn (gl_next), then waits
+; gen_delay beats; one that cannot launch tries again next frame.
+; In:      none
+; Out:     the generators' e_head, e_tmr; gliders launched (glpool,
+;          their entities, gl_next, gl_phase)
+; Trashes: d0-d5, a0-a3, a5, a6
+gen_step:
+        move.w  headroom+16(pc),d4  ; the beats simulated this loop
+        lea     gens(pc),a6
+        move.w  (a6)+,d5
+        bra     .gend
+.gen:   move.l  (a6)+,a3
+        tst.w   e_flags(a3)
+        beq     .gend               ; destroyed
+        move.w  d4,d0
+        mulu.w  #gen_spin,d0
+        add.w   d0,e_head(a3)       ; turning
+        sub.w   d4,e_tmr(a3)
+        bgt.s   .gend               ; not yet
+        clr.w   e_tmr(a3)
+        moveq   #0,d1               ; its own gliders in flight
+        lea     glpool(pc),a0
+        lea     ngl*g_size(a0),a1
+.own:   move.l  g_ent(a0),a5
+        tst.w   e_flags(a5)
+        beq.s   .on
+        cmpa.l  g_gen(a0),a3
+        bne.s   .on
+        addq.w  #1,d1
+.on:    lea     g_size(a0),a0
+        cmpa.l  a1,a0
+        blo.s   .own
+        cmp.w   #gen_own,d1
+        bhs.s   .gend               ; enough of its own up
+        move.w  gl_next(pc),d0      ; the type
+        mulu.w  #gt_size,d0
+        lea     gltypes(pc),a2
+        adda.w  d0,a2
+        move.w  e_x(a3),d0
+        move.w  e_z(a3),d1
+        move.w  e_head(a3),d2
+        bsr     glider_launch
+        bcs.s   .gend               ; all ngl up: next frame
+        move.w  #gen_delay,e_tmr(a3)
+        lea     gl_next(pc),a0
+        addq.w  #1,(a0)
+        cmp.w   #(gltypes_e-gltypes)/gt_size,(a0)
+        blo.s   .gend
+        clr.w   (a0)
+.gend:  dbf     d5,.gen
+        rts
+
+; ---------------------------------------------------------------- gen alert
+; gen_alert: the gliders launched by the generator a5 attack (spec 6:
+; hitting a generator alerts its gliders).
+; In:      a5 = the generator
+; Out:     their g_alert
+; Trashes: a3
+gen_alert:
+        move.l  a0,-(sp)
+        lea     glpool(pc),a3
+        lea     ngl*g_size(a3),a0
+.g:     cmpa.l  g_gen(a3),a5
+        bne.s   .n
+        move.w  #1,g_alert(a3)
+.n:     lea     g_size(a3),a3
+        cmpa.l  a0,a3
+        blo.s   .g
+        move.l  (sp)+,a0
+        rts
 
 ; ------------------------------------------------------------------ gl test
 ; gl_test: the test rig's gliders (test_gl), until the generators launch

@@ -57,9 +57,10 @@ wbound  macro
 
 ; beat_poll: consume a frame edge that fired since the last poll and
 ; count it in xbeats. The frame bit cannot count two edges, so the work
-; is polled at stage boundaries (after the lattice, after each drawn
-; object; every stage is under a beat) and the loop's beats = 1 + the
-; edges consumed.
+; is polled at stage boundaries (after each erase box, the erases, each
+; simulated beat, the lattice, each drawn object, the shots, the
+; sparks; every stretch between two polls is under a beat) and the
+; loop's beats = 1 + the edges consumed.
 ; In:      none
 ; Out:     xbeats + 1 when an edge was pending (and the edge consumed)
 ; Trashes: none
