@@ -67,7 +67,11 @@ Rules that keep the engine speed-independent:
   follow the flight model: one step per elapsed beat, never one
   scaled step per loop. Outcomes are then identical at 16.7 and
   50 Hz, and a shot cannot tunnel through a glider on a 3-beat loop
-  (it would move 3 x `shot_v` between tests).
+  (it would move 3 x `shot_v` between tests). As built in M3: the
+  gliders' AI thinks every 2 beats (a fixed count, staggered), so it
+  reacts alike at any frame rate; the generators step once a frame
+  by the loop's beats (a timer and a spin, both linear), so a launch
+  lands on a frame boundary, up to 2 beats late at 16.7 Hz.
 - **No self-modifying code.** A 68020 or later (Super Gold Card,
   Q40/Q60) caches instructions and does not see data writes to code,
   so a patched instruction can run stale. The erase's remainder burst
@@ -204,9 +208,11 @@ Frame order in the back buffer `a4`:
 7. HUD: the sight (red while flashing a hit), the radar sweep and
    blips, strip readouts when they change, meters.
 8. VBL wait, flip, beat count. The frame bit cannot count two missed
-   edges, so the work polls it at stage boundaries (after the lattice,
-   after each drawn object; every stage is under a beat) and the
-   loop's beats are 1 + the edges consumed, up to 3.
+   edges, so the work polls it at stage boundaries (since M3: after
+   every erase box, the erases, each simulated beat, the lattice, each
+   drawn object, the shots and the sparks; every stretch between two
+   polls must stay under a beat -- a full-screen erase box is ~29 ms)
+   and the loop's beats are 1 + the edges consumed.
 
 All erases run before any draw, so overlapping boxes cost nothing.
 
@@ -470,16 +476,22 @@ whole object per frame (~13 ms, section 9).
   directory index (-1 ends the pool), flags (0 = inactive), x, z
   (16-bit integer world units, the fractional part only matters for
   the player), centre height above the ground (`yb_<mesh>` for
-  standing meshes, `cam_h` for the mine), heading (8.8 brads), two
-  words for hp, timers and AI state (M3). Static entities (towers,
-  blocks, generators, mines, energy packs) come from the sector's
-  level table, copied into the pool at start; dynamic ones (gliders,
-  shots, explosions) are allocated from the pool.
+  standing meshes, `cam_h` for the mine), heading (8.8 brads), the
+  hits taken, and a timer (a generator's next launch). Static entities
+  (towers, blocks, generators, mines, energy packs) come from the
+  sector's level table, copied into the pool at start. As built in M3,
+  the gliders' entities are the `ngl` slots after the level's, each
+  paired at start with a glider record that holds its flight and AI
+  state (`e_flags` 0 = the slot is free); shots and explosions have
+  arrays of their own.
 - **Mesh directory** (`tools/genmesh.py --game`, 32 bytes per mesh):
   counts, colour, vertex/face/edge/plane table offsets, ybase,
-  bounding radius, collision radius; edge tables index the engine's
-  12-byte vertex scratch records directly. The parade's default
-  output is untouched.
+  bounding radius, collision radius, radar blip colour, hits to
+  destroy, contact effect, a moving flag (the gliders: left out of
+  the static lists the shot casts and the craft's walls use) and the
+  explosion burst (an offset into `sparks.inc`); edge tables index
+  the engine's 12-byte vertex scratch records directly. The parade's
+  default output is untouched.
 - **Types and meshes** (all convex; genmesh asserts it):
   - tower: hex prism, vertex radius 48, 384 tall (top 256 above the
     eye; M2), white, obstacle; stops shots.
@@ -487,7 +499,9 @@ whole object per frame (~13 ms, section 9).
     obstacle; stops shots.
   - generator: a white crystal (a tall bipyramid, 384 tall, radius
     96, standing on its lower tip), turning slowly; 5 hits; the
-    sector's targets. Launches the enemy gliders (below).
+    sector's targets. Launches the enemy gliders (below). Built in M3
+    on a square: 6 vertices, 8 faces, turning a quarter brad a beat;
+    an obstacle to the craft, a 32-spark white burst when destroyed.
   - enemy gliders (**decided**): abstract, red, 4..6 vertices, which
     should cost roughly half a tower each (estimate), so 3..4 can
     share the screen. Everything is seen nearly edge-on from 128
@@ -500,6 +514,13 @@ whole object per frame (~13 ms, section 9).
     - wedge (5: a pyramid lying on its side, nose forward): 2 hits,
       holds its range and strafes;
     - kite (6: a bipyramid on a kite outline): 3 hits, fires bursts.
+
+    Built in M3 (2026-10-04, `genmesh.py`): nose along +z, the dart
+    128 long with a 112 span and a dorsal point 36 up, the wedge a
+    96 x 40 back face with the nose 120 ahead, the kite 144 long and
+    128 wide, 56 high; collision radii 80, 80, 96. The hull centre
+    skims at `gl_y` = 80, the gun ports' height (the draft's ~72), so
+    their shots leave from it and draw like the player's.
   - mine (**kept**): the red octahedron at hover height, static
     hazard; 1 hit destroys it (score), contact costs 2 shield.
   - energy pack: a small green octahedron floating ~44 units up,
@@ -510,12 +531,38 @@ whole object per frame (~13 ms, section 9).
   hold the type's preferred range, fire when the player is inside a
   small cone and in range. They drift through turns just as the
   player does.
+
+  Built in M3 (2026-10-04, `enemy.asm`, types in `types.inc`), first
+  values from a scratchpad model against a scripted player (a static
+  player is hit by most shots, a weaving one by few): each glider
+  flies the section-4 model with its type's thrust and turn ramp (no
+  brake, reverse or cap: the AI uses none, and the terminal speed
+  stays under `vmax`), and thinks every 2 beats. The player is taken
+  into the glider's frame (`fwd`, `rgt`: four multiplies, no atan);
+  it turns toward the player until the aim error across is within 16
+  units and thrusts beyond its hold range; it fires when the player is
+  ahead within its fire range and within 40 units across the nose.
+  The dart (thrust 2, terminal 32 units a beat) always thrusts, fires
+  on the way in and inside 700 aims 128 beside the player, so it
+  passes and loops round (~900-unit loops); the wedge coasts inside
+  1000 and orbits there with the player abeam for 50 beats of every
+  160, then turns in to fire; the kite (terminal 20) stands off at
+  1100 and fires bursts of three 6 beats apart every 90. A glider
+  launched by a generator patrols round it (cloverleaf loops at full
+  thrust, the generator held abeam inside 600) until the player comes
+  within 1800 or the generator is hit, then attacks; beyond 3500 it
+  returns to its patrol while the generator stands. Gliders pass
+  through obstacles and through each other (not modelled).
 - **Generators launch the gliders** (**decided**): each keeps up to
   two of its own alive, relaunching after a delay, under a global cap
   on active gliders (4 to start: the budget knob). Hitting a generator
   alerts the gliders near it. A destroyed generator stops launching,
   so the enemy count, and the CPU load, falls as the player
-  progresses.
+  progresses. Built in M3 (`gen_step`): a launch every 500 beats
+  (10 s) per generator, the types in turn, from its centre along its
+  heading; the level table's timer word staggers the first ones; the
+  alert reaches the gliders the generator launched. The test sector
+  has three, one 2500 ahead of the spawn.
 - **Energy packs**: fixed spots in the level table, plus an
   occasional drop where a glider dies.
 - **Objectives and lives** (**decided**): destroy every generator.
@@ -566,8 +613,11 @@ runs once per beat (section 2.1).
   world is cast once per shot at launch (`shot_cast`: the entities
   inside the world box, taken into the shot's frame, the nearest entry
   into a collision circle): the hit is then a per-beat countdown, and
-  a target gone meanwhile means a new cast. Gliders will need a
-  per-beat test of their own. Drawn through the lattice's reciprocal
+  a target gone meanwhile means a new cast. The gliders, which move,
+  are tested every beat (`shot_gl`, M3: a box reject, then the beat's
+  sweep of the head in the shot's frame against the glider's
+  collision circle); a hit that does not destroy puffs 4 sparks.
+  Drawn through the lattice's reciprocal
   table (no divides) only between `znear` and `zfar`, so no clipping:
   ~1 ms per visible bolt (two projections, a line, an erase box);
   firing costs ~5 ms a frame with 3-4 bolts on screen.
@@ -575,7 +625,16 @@ runs once per beat (section 2.1).
   M3 if digital aiming proves too coarse.
 - **Enemy shots**: a pool of 4, red, fired along the glider's heading,
   slow enough to see and slide out of (the drift is the dodge); they
-  hit the player inside `craft_r` and are stopped by obstacles.
+  hit the player inside `craft_r` and are stopped by obstacles. Built
+  in M3: 40 units a beat for 45 beats (range 1800), from 64 ahead of
+  the hull centre, drawn 48 long like the player's; the static world
+  is cast at launch (`shot_cast`, now dividing by the shot's own
+  speed), the craft tested every beat (the head's sweep against
+  `craft_r`). Each hit costs 1 shield.
+- **Glider-craft contact** (M3, `glider_bump`): the two swap the
+  normal component of their relative velocity (equal masses), both
+  are halved and both moves undone; a bump at `bump_v` or more costs
+  1 shield, as a wall does.
 - **Damage**: `shield` holds 8. A hit turns the sight red (section
   5.4) and plays the damage sound; zero = craft destroyed, windshield
   crack, next craft (section 6). Until M4, zero restarts the craft at
@@ -592,6 +651,15 @@ the energy-pack chime, damage, the warp. One beep transfer costs about
 KEYROW read, so they go where it goes: after the work, before the VBL
 wait (CLAUDE.md rule 13). A sustained engine tone is free per frame
 but warbles when the keyboard is read; try it, drop it if it annoys.
+
+Built in M3 (2026-10-04, `sounds.inc`, `sfx_play`): six effects --
+the player's zap, a lower enemy zap, a blip for a hit that does not
+destroy, a buzz for lost shield, an explosion, a deeper one for a
+generator -- requested where they happen with the `sfx` macro, whose
+number is the priority (explosion > damage > hit > enemy fire > fire;
+no pickup or warp yet); the highest of the frame is sent after the
+keyboard read. The parameter blocks are first guesses, not yet heard;
+no engine tone.
 
 ## 9. Budgets
 
@@ -688,6 +756,31 @@ view before any glider, shot or spark: the section 9 table's
 per-object figure (half a tower per glider, ~6 ms) and the M2 levers
 decide how many gliders fit.
 
+**Measured, M3 gliders and generators (Q-emuLator, 2026-10-04,
+latched 128-loop windows; `no_gls`/`no_gld` skip the gliders' beats /
+drawing)**. With the 3 attackers of `test_gl` round a static player:
+three far gliders frozen ahead +11 ms (~3.7 ms each drawn), their
+beats and shots without drawing +7.9 ms (~0.55 ms a glider-beat, so
+the cost grows with the beats a loop takes), all live 79.2 ms (4.4
+beats). With the generators in the test sector:
+
+| Scene | work ms | beats |
+|---|---|---|
+| spawn, gliders' beats off (the crystal ahead drawn) | 62.5 | 4.0 |
+| spawn, its gliders patrolling ahead | 75.6 | 4.2 |
+| 3 gliders attacking a static player | 97.3 | 5.4 |
+| flying through the sector, autofire | 77.2 | 4.3 |
+
+The far crystal ahead alone costs ~7.7 ms: per-vertex and per-face
+overhead, not pixels, as for M2's far towers. So the game now runs at
+4..5 beats (12.5..10 Hz), past the 3-beat design budget. Levers
+measured: `zfar` 2048 -> 1536 saves 7.8 ms at the spawn; the dev
+readouts 1.2..2.6 ms; a glider cap of 2 with three would-be attackers
+saves 16.4 ms (one glider less: its drawing, its beats, and the beats
+it adds). Not yet tried: the M2 levers (far LOD, a reciprocal table
+for the projection divides), thinking every 4 beats, a cheaper
+object-stage overhead per mesh. Decision pending (section 12).
+
 Memory: code + tables well under 64 KB; meshes a few KB; two dot lists
 of 128 x 4 bytes; entity pool 64 x 16 bytes; level tables a few KB.
 Meters stay in the build (`no_erase`/`no_draw` style flags) until the
@@ -755,11 +848,13 @@ initialise with `lea label(pc)` at runtime. No self-modifying code
    ports, hits cast at launch), the craft's collisions and shield
    with the bar and the red flash (section 7), and the explosions
    (section 5.6: precomputed bursts). Played on Q-emuLator and on the
-   NanoQL core (2026-10-04): fine. **Still to do in M3**: the enemy
-   gliders (dart, wedge, kite meshes; AI on the flight model; their
-   shots; a per-beat shot test, since they move; glider-vs-craft
-   bumps), the generators launching them, sound; the spawn point and
-   `test_keys` make scripted tests of each easy.
+   NanoQL core (2026-10-04): fine. **Then, 2026-10-04** (branch
+   `m3-gliders`): the enemy gliders (dart, wedge, kite meshes; AI on
+   the flight model, patrol and alert; their shots; the per-beat shot
+   test; glider-craft bumps), the generators launching them (three in
+   the test sector), sound effects, and beat polls at every stage
+   boundary. **Left in M3**: the budget decision (section 9: 4..5
+   beats now), tuning the AI and the sounds by play and by ear.
 4. **M4 sectors**: level tables (`tools/genlevel.py`), energy packs,
    the warp, three craft and the windshield crack, score, title and
    end screens.
@@ -801,4 +896,9 @@ same at any frame rate; no self-modifying code.
 - Score values, extra craft (at score thresholds or not), the
   difficulty curve per sector.
 - The warp effect's details; what the bottom band becomes (M5).
+- The frame budget with gliders (section 9): 4..5 beats against the
+  3-beat design budget -- accept 4, or which levers (fewer objects in
+  view, `zfar`, the glider cap, far LOD, projection tables).
+- Gliders through obstacles and each other: avoid (a cell map of the
+  sector, a look-ahead a cell), or leave it.
 - Skyline (back burner): vector triangle mountains, if ever.

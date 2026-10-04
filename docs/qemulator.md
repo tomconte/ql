@@ -148,6 +148,15 @@ What it relies on (found and checked 2026-09-29 on 4.0.4, 32-bit):
   holds $20000 under hello. The memory pointer is the long equal to the
   block address.
 
+**Each qlshot call costs the emulated QL a moment.** While it scans the
+process (finding the block, the load address), the emulation falls
+behind the wall clock and needs a few seconds to catch up. Measured
+2026-10-04 on glider with a beat counter in the program (`headroom+40`):
+peeks 1 s apart read ~70% of the real beats (42 of 60), 5..6 s apart
+99..100%. The program's own meters count in emulated time and are not
+affected; only timing against the wall clock is, so space such peeks
+5 s or more apart.
+
 ## IPC reads and frame timing
 
 Measured on the glider rig (2026-09-10): a KEYROW read (`kbd_row`, 16

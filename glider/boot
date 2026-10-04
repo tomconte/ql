@@ -1,4 +1,4 @@
-100 PRINT "Glider M2: Left/Right turn, Up thrust, Down brake then reverse, Enter resets."
-110 PRINT "Sparse map, a 4-tower base at +x/-z. HUD: speed x10, drift x10, heading, objects;"
+100 PRINT "Glider M3: Left/Right turn, Up thrust, Down brake then reverse, Space fires, Enter resets."
+110 PRINT "Shoot the white generators; their red gliders defend them. HUD: speed x10, drift x10, heading, objects;"
 115 PRINT "meters: spins/extra beats | buffer 0/1 spins | min/max."
 120 EXEC mdv1_glider_bin
