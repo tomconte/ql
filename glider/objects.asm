@@ -351,7 +351,8 @@ objects:
 ; .blip: the radar blip of the entity at camera-space (xc, zc) = (d1,
 ; d2), in its mesh's colour (od_blip(a0), 1 red, 2 green, 3 white):
 ; centre + (xc/128, -zc/192), a pixel per plane, shown inside the
-; circle (rad_range, the rim table). Dots are appended to the dot list
+; circle (rad_range, the rim table rad_rim; the generators outside it
+; are rim_blips' in strip.asm). Dots are appended to the dot list
 ; and recorded only where they turned a pixel on (bset tests and sets),
 ; so the erase never eats the radar frame. Trashes d0, d4, d5, a1, a2.
 .blip:  move.w  d1,d4
@@ -364,7 +365,8 @@ objects:
         move.w  d2,d5
         muls.w  #rad_ymul,d5
         swap    d5                  ; oy = zc/192 (floor)
-        move.b  .rim(pc,d0.w),d0    ; the circle's half-height at |ox|
+        lea     rad_rim(pc),a2
+        move.b  (a2,d0.w),d0        ; the circle's half-height at |ox|
         tst.w   d5
         bpl.s   .b2
         neg.b   d0
@@ -405,7 +407,3 @@ objects:
         move.l  dl_base(pc),a2
         addq.w  #1,(a2)             ; the count
 .bd:    rts
-; half-height of the radar circle in rows at |ox| = 0..18 px:
-; round(12 * sqrt(1 - (ox/18)^2))
-.rim:   dc.b    12,12,12,12,12,12,11,11,11,10,10,9,9,8,8,7,5,4,0
-        even

@@ -1026,6 +1026,20 @@ the spawn view takes 55.9 ms and runs a steady 3-beat loop, where the
 dev build alternates 3 and 4 beats (57.5 ms); a full turn averages
 44.2 ms (47.3).
 
+Then the strip's readouts (`strip.asm`, `strip.inc`): the score in
+packed BCD (`score_add`: three `abcd`), points from `objpts` (genmesh
+`--game`, a word per mesh), added in `shots_step` where a shot
+destroys; drawn with `draw_bcd` at x 448 (6 digits, leading zeros
+blank), the crystals left at x 400 (a white crystal icon and a digit),
+a delta per spare craft under the shield bar -- all into both screens
+when something changes (`hud_check` after the simulation). The rim
+blips (`rim_blips`, before the sweep): per live generator out of
+range, the object stage's circle test replayed, the bearing from an
+octant and `brg_tab`, the blip on the last record of that angle's
+sweep list, white. Measured: ~0.5 ms per crystal out of range (the
+spawn view with three: 57.4 ms, still a 3-beat loop; a full turn
+45.2 ms); it falls as crystals go.
+
 ## 12. Decisions and open questions
 
 **Decided** (v0.1): first-person, craft never drawn; yaw only, no

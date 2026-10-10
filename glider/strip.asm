@@ -1,6 +1,8 @@
 ; strip.asm -- glider: the top strip and the sight (spec 5.4): the
 ; four-corner sight over the play area, the shield bar at the left of
-; the strip, the heading-up radar at its centre. Included by glider.asm.
+; the strip, the heading-up radar at its centre (with the out-of-range
+; crystals on its rim), the score and the crystals left at the right,
+; the spare craft under the bar. Included by glider.asm.
 
 ; -------------------------------------------------------------- sight erase
 ; sight_erase: at the erase stage, clear the sight this buffer shows
@@ -248,4 +250,237 @@ radar:
 .swe:   dbf     d1,.sw
         lea     dl_next(pc),a0
         move.l  a1,(a0)
+        rts
+
+; ---------------------------------------------------------------- rim blips
+; rim_blips: the live generators beyond the radar's range pinned to its
+; rim at their bearing (spec 5.4, Beta 1: the crystals sit beyond it at
+; the spawn, and the last one is otherwise hard to find), white, through
+; the dot list. The ones in range have their blips from the object stage
+; (objects, .blip: the same circle test, so each gets exactly one). Per
+; generator: its centre in camera space (4 multiplies), the bearing to a
+; 64th of a turn (an octant, a divide, brg_tab), and the rim pixel = the
+; last record of that angle's sweep list (radar_tabs: never a frame
+; pixel). Before the sweep, whose room past dl_end it leaves alone.
+; In:      a4 = back buffer base, the dot list open, ocam (this frame's
+;          camera)
+; Out:     the blips appended to the dot list (dl_next, count)
+; Trashes: d0-d6, a0, a1, a3, a5
+rim_blips:
+        lea     gens(pc),a5
+        move.w  (a5)+,d6
+        bra     .gend
+.gen:   move.l  (a5)+,a3
+        tst.w   e_flags(a3)
+        beq     .gend               ; destroyed
+        move.w  e_x(a3),d0
+        sub.w   ocam+oc_px(pc),d0
+        lsl.w   #16-sector_sh,d0
+        asr.w   #16-sector_sh,d0    ; dx (nearest image)
+        move.w  e_z(a3),d1
+        sub.w   ocam+oc_pz(pc),d1
+        lsl.w   #16-sector_sh,d1
+        asr.w   #16-sector_sh,d1    ; dz
+        move.w  d0,d2
+        muls.w  ocam+oc_c(pc),d2    ; dx*c
+        move.w  d1,d3
+        muls.w  ocam+oc_s(pc),d3    ; dz*s
+        sub.l   d3,d2
+        asr.l   #8,d2               ; xc
+        muls.w  ocam+oc_c(pc),d1    ; dz*c
+        muls.w  ocam+oc_s(pc),d0    ; dx*s
+        add.l   d0,d1
+        asr.l   #8,d1               ; zc
+; --- in range: the object stage's circle test (ox = xc/128, oy = zc/192
+; against rad_rim), which gave it its blip
+        move.w  d2,d4
+        asr.w   #rad_xsh,d4
+        bpl.s   .ox
+        neg.w   d4                  ; |ox|
+.ox:    cmp.w   #rad_rx,d4
+        bgt.s   .far                ; beyond the circle's sides
+        move.w  d1,d5
+        muls.w  #rad_ymul,d5
+        swap    d5                  ; oy (floor)
+        lea     rad_rim(pc),a0
+        move.b  (a0,d4.w),d4        ; the circle's half-height at |ox|
+        tst.w   d5
+        bpl.s   .oy
+        neg.b   d4
+        cmp.b   d4,d5
+        blt.s   .far                ; below the circle
+        bra     .gend               ; inside: blipped already
+.oy:    cmp.b   d4,d5
+        ble     .gend               ; inside
+; --- the bearing, clockwise from ahead in 64ths of a turn: within the
+; octant from the smaller to larger ratio (i/32, brg_tab), then folded
+; out by the signs (xc and zc are never both 0 here: that is in range)
+.far:   move.w  d2,d4
+        bpl.s   .ax
+        neg.w   d4                  ; |xc|
+.ax:    move.w  d1,d5
+        bpl.s   .az
+        neg.w   d5                  ; |zc|
+.az:    lea     brg_tab(pc),a0
+        moveq   #0,d0
+        cmp.w   d4,d5
+        blo.s   .xmaj
+        move.w  d4,d0
+        lsl.l   #5,d0
+        divu.w  d5,d0               ; i = |xc|*32/|zc|
+        moveq   #0,d3
+        move.b  (a0,d0.w),d3        ; from ahead
+        bra.s   .quad
+.xmaj:  move.w  d5,d0
+        lsl.l   #5,d0
+        divu.w  d4,d0               ; i = |zc|*32/|xc|
+        moveq   #16,d3
+        sub.b   (a0,d0.w),d3        ; from abeam
+.quad:  tst.w   d1
+        bpl.s   .zp
+        neg.w   d3
+        add.w   #32,d3              ; behind: 32 - a
+.zp:    tst.w   d2
+        bpl.s   .xp
+        neg.w   d3                  ; left: -a
+.xp:    and.w   #rad_nang-1,d3      ; the sweep list
+; --- the rim pixel, white: a record per plane in the dot list
+        mulu.w  #rad_stride,d3
+        lea     ds_base(pc),a0
+        add.l   d3,a0
+        lea     radtab(a0),a0
+        move.w  (a0)+,d0            ; its records
+        beq.s   .gend
+        subq.w  #1,d0
+        lsl.w   #2,d0
+        move.l  (a0,d0.w),d0        ; the last: offset : inverse mask
+        move.l  dl_next(pc),a1
+        lea     8(a1),a0
+        cmpa.l  dl_end(pc),a0
+        bhi.s   .gend               ; no room for two records
+        move.w  d0,d4
+        not.b   d4                  ; the pixel's mask
+        move.l  d0,(a1)+            ; green: the record,
+        swap    d0
+        or.b    d4,(a4,d0.w)        ;   the pixel
+        addq.w  #1,d0               ; red: the odd byte
+        or.b    d4,(a4,d0.w)
+        swap    d0
+        move.l  d0,(a1)+
+        lea     dl_next(pc),a0
+        move.l  a1,(a0)
+        move.l  dl_base(pc),a0
+        addq.w  #2,(a0)             ; the count
+.gend:  dbf     d6,.gen
+        rts
+
+; ---------------------------------------------------------------- score add
+; score_add: points added to the score (packed BCD, 6 digits; past
+; 999999 it wraps), and the strip's readouts marked for redrawing.
+; In:      d0.l = the points (packed BCD, up to 6 digits)
+; Out:     score, hud_chg
+; Trashes: d0, d1, a0
+score_add:
+        lea     score(pc),a0
+        move.l  (a0),d1
+        move.w  #0,ccr              ; X clear
+        abcd    d0,d1               ; units and tens
+        ror.l   #8,d0
+        ror.l   #8,d1
+        abcd    d0,d1               ; hundreds and thousands
+        ror.l   #8,d0
+        ror.l   #8,d1
+        abcd    d0,d1               ; the rest (a carry out is lost)
+        swap    d1                  ; the bytes back in place
+        move.l  d1,(a0)
+        lea     hud_chg(pc),a0
+        move.w  #1,(a0)
+        rts
+
+; ---------------------------------------------------------------- score pts
+; score_pts: the points for destroying entity a5 (objpts, by its mesh)
+; added to the score.
+; In:      a5 = the entity
+; Out:     score, hud_chg
+; Trashes: d0, d1, a0
+score_pts:
+        move.w  e_mesh(a5),d0
+        add.w   d0,d0
+        lea     objpts(pc),a0
+        moveq   #0,d1
+        move.w  (a0,d0.w),d1
+        move.l  d1,d0
+        bra.s   score_add           ; tail call
+
+; ---------------------------------------------------------------- hud check
+; hud_check: after the simulation, the strip's readouts redrawn when
+; something they show changed (hud_chg: points scored, which is also
+; how a crystal goes).
+; In:      none
+; Out:     hud_chg cleared
+; Trashes: d0-d4, a0-a3
+hud_check:
+        lea     hud_chg(pc),a0
+        tst.w   (a0)
+        beq.s   .done
+        clr.w   (a0)
+        bra.s   strip_draw          ; tail call
+.done:  rts
+
+; --------------------------------------------------------------- strip draw
+; strip_draw: the strip's readouts into both screens at once (spec 5.4;
+; they change rarely and nothing else draws there): the score at the
+; right in the HUD digits, the crystals left beside it (a white crystal
+; and the count), a craft icon per spare craft under the shield bar.
+; In:      none
+; Out:     none
+; Trashes: d0-d4, a0-a3
+strip_draw:
+        lea     scr0,a3
+        bsr.s   .one
+        lea     scr1,a3
+.one:   lea     sb_y*scr_llen+sc_x/4(a3),a0     ; the score
+        lea     score+1(pc),a1
+        moveq   #3,d0
+        bsr     draw_bcd
+        lea     sb_y*scr_llen+cr_x/4(a3),a0     ; the crystal, white
+        lea     ic_crystal(pc),a1
+        moveq   #7-1,d0
+.ic:    move.b  (a1),(a0)
+        move.b  (a1)+,1(a0)
+        lea     scr_llen(a0),a0
+        dbf     d0,.ic
+        moveq   #0,d1               ; the crystals left: the live ones
+        lea     gens(pc),a1
+        move.w  (a1)+,d0
+        bra.s   .gce
+.gc:    move.l  (a1)+,a2
+        tst.w   e_flags(a2)
+        beq.s   .gce
+        addq.w  #1,d1
+.gce:   dbf     d0,.gc
+        mulu.w  #vf_dh,d1           ; one digit (ngen < 10)
+        lea     vf_dig(pc),a1
+        adda.w  d1,a1
+        lea     sb_y*scr_llen+cr_x/4+2(a3),a0
+        moveq   #vf_dh-1,d0
+.cd:    move.b  (a1)+,(a0)
+        lea     scr_llen(a0),a0
+        dbf     d0,.cd
+        move.w  craft_n(pc),d1      ; the spare craft: craft_n - 1 icons
+        subq.w  #1,d1
+        lea     sp_y*scr_llen+sb_x/4(a3),a0
+        moveq   #ncraft-2,d2        ; a slot per possible spare
+.sp:    lea     ic_craft(pc),a1
+        moveq   #4-1,d0
+.sr:    moveq   #0,d3
+        tst.w   d1
+        ble.s   .sb
+        move.b  (a1)+,d3            ; a spare: its icon
+.sb:    move.b  d3,(a0)             ;   (else blank)
+        lea     scr_llen(a0),a0
+        dbf     d0,.sr
+        lea     4-4*scr_llen(a0),a0 ; the next slot, 16 px on
+        subq.w  #1,d1
+        dbf     d2,.sp
         rts

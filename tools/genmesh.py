@@ -151,6 +151,11 @@ GAME_MOVE = {"dart", "wedge", "kite"}
 GAME_BURST = {"mine": "mine", "dart": "glider", "wedge": "glider",
               "kite": "glider", "gen": "gen"}
 
+# The points for destroying a mesh with a shot (spec 6, Beta 1), as
+# packed BCD: the objpts table, a word per mesh after the directory.
+GAME_POINTS = {"mine": 0x50, "dart": 0x100, "wedge": 0x200, "kite": 0x300,
+               "gen": 0x1000}
+
 SHOW_RADIUS = 84        # parade: projection-safe bound (Z0=300, focal
                         # 256/170): the cube's 83 is proven on screen (x
                         # 256+-98, y 120+-66, clear of the meter rows at 240)
@@ -332,6 +337,10 @@ def emit_game():
         burst = f"spk_{GAME_BURST[name]}-sparks" if name in GAME_BURST else "0"
         print(f"        dc.w    {GAME_HP.get(name, 0)},{GAME_TOUCH.get(name, 0)},"
               f"{1 if name in GAME_MOVE else 0},{burst}")
+    print("; points for destroying each mesh (packed BCD), by directory index")
+    print("objpts:")
+    for m in out_meshes:
+        print(f"        dc.w    ${GAME_POINTS.get(m[0], 0):04x}    ; {m[0]}")
 
 if "--game" in sys.argv[1:]:
     emit_game()

@@ -440,3 +440,12 @@ objdir:
         dc.w    m_gen_v-meshes,m_gen_f-meshes,m_gen_e-meshes,m_gen_n-meshes
         dc.w    192,192,96,3
         dc.w    5,0,0,spk_gen-sparks
+; points for destroying each mesh (packed BCD), by directory index
+objpts:
+        dc.w    $0000    ; tower
+        dc.w    $0000    ; block
+        dc.w    $0050    ; mine
+        dc.w    $0100    ; dart
+        dc.w    $0200    ; wedge
+        dc.w    $0300    ; kite
+        dc.w    $1000    ; gen

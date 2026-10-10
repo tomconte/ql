@@ -68,7 +68,8 @@ sector_load:
 ; the gliders, shots and explosions gone, the live generators' launch
 ; timers back to the level table's (so the craft is not met by the
 ; gliders that got the last one), the craft at the spawn with a full
-; shield and its bar, no event pending, the next simulation one beat.
+; shield and its bar, the strip's readouts, no event pending, the next
+; simulation one beat.
 ; Destroyed entities stay destroyed. Screen 0 is shown: the loop starts
 ; with d7 = 1.
 ; In:      none
@@ -128,7 +129,8 @@ craft_start:
         lea     headroom+16(pc),a0  ; the first loop simulates one beat
         move.w  #1,(a0)
         bsr     craft_reset         ; at the spawn,
-        bsr     shield_reset        ; the shield full, its bar drawn
+        bsr     shield_reset        ; the shield full, its bar drawn,
+        bsr     strip_draw          ; the score, crystals, spare craft
         ifne    test_gl
         bsr     gl_test             ; a dart, a wedge, a kite ahead
         endc

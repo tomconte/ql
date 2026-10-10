@@ -212,14 +212,15 @@ shield_reset:
 ; says: the static world's first hit is known at launch (testing every
 ; shot against every nearby entity each beat cost ~8 ms a frame). A hit
 ; stops the shot; an entity whose mesh has od_hp takes it (e_hp, a puff
-; of sparks) and goes (e_flags = 0, an explosion) at od_hp hits, the
-; rest are obstacles. A target gone meanwhile (another shot got it)
-; means a new cast from where the shot is. With none in flight and Space
-; up it returns at once. (The sight's blink while shots flew, spec v0.2,
-; was dropped on 2026-09-30: it annoyed in play.)
+; of sparks) and goes (e_flags = 0, an explosion, its points: Beta 1)
+; at od_hp hits, the rest are obstacles. A target gone meanwhile
+; (another shot got it) means a new cast from where the shot is. With
+; none in flight and Space up it returns at once. (The sight's blink
+; while shots flew, spec v0.2, was dropped on 2026-09-30: it annoyed in
+; play.)
 ; In:      d5.b = held keys (row-1 bits)
 ; Out:     shots, nlive, fire_t, gun_lr; entities hit (e_hp, e_flags),
-;          booms, sfx_want
+;          booms, sfx_want, score, hud_chg
 ; Trashes: d0-d4, a0-a3, a5
 shots_step:
         lea     fire_t(pc),a2
@@ -321,6 +322,7 @@ shots_step:
         bgt.s   .puff
         clr.w   e_flags(a5)         ; destroyed
         bsr     boom_add
+        bsr     score_pts           ; its points
         bra.s   .snext
 .puff:  bsr     boom_hit            ; hit, not yet destroyed
         bra.s   .snext

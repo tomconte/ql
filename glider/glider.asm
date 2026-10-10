@@ -41,7 +41,8 @@
 ;   render.asm   list selectors, the erase stages, erase-box extend,
 ;                projection, clipping
 ;   hud.asm      readouts, meters, meter window, headroom bar, sound
-;   strip.asm    the sight, the radar (the top strip)
+;   strip.asm    the top strip: the sight, the radar, the readouts,
+;                the score
 ;   flow.asm     the game flow's resets: game, sector, craft, screens
 ;   screens.asm  title, sector card, game over, pause; text helpers
 ;   vars.inc     variables and scratch
@@ -49,6 +50,7 @@
 ;   types.inc    the enemy glider types
 ;   sounds.inc   the sound effects
 ;   texts.inc    the words of the screens around play
+;   strip.inc    the strip's tables and icons
 ;   then meshes.inc, sparks.inc and sin.inc (generated), the supervisor
 ;   stack, the
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
@@ -191,7 +193,8 @@ frame_loop:
         endc
         beat_poll
         dbf     d6,.beat
-        bsr     shield_check        ; the bar, or the next craft at zero
+        bsr     shield_check        ; the bar; at zero the craft is lost
+        bsr     hud_check           ; the score and the crystals left
         ifeq    no_gls
         bsr     gen_step            ; the generators turn and launch
         endc
@@ -237,6 +240,7 @@ frame_loop:
 ; ----- top strip: the radar's sweep (its frame is static; the blips
 ; come from the object stage)
         ifeq    no_rad
+        bsr     rim_blips           ; the crystals out of range, on the rim
         bsr     radar
         endc
 
@@ -325,6 +329,7 @@ frame_loop:
         include "types.inc"
         include "sounds.inc"
         include "texts.inc"
+        include "strip.inc"
 
         include "meshes.inc"
         include "sparks.inc"

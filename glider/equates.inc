@@ -133,6 +133,13 @@ hurt_b      equ     25
 flash_b     equ     6
 sb_x        equ     16              ; the shield bar: x (a multiple of 8),
 sb_y        equ     8               ; first row (6 rows)
+; the strip's readouts (Beta 1; x multiples of 8, the HUD digits and
+; icons 7 rows from sb_y): the score's 6 digits, the crystals left (a
+; white crystal, then the count), the spare craft under the shield bar
+; (one icon per 16 px like the bar's slots, 4 rows)
+sc_x        equ     448
+cr_x        equ     400
+sp_y        equ     sb_y+9
 
 ; ----- explosions (spec 5.6): up to nboom at once, each a burst from
 ; sparks.inc (tools/gensparks.py: up to spk_n sparks for spk_life beats)
