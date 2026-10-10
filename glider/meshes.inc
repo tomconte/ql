@@ -412,11 +412,11 @@ yb_kite     equ     24
 msh_gen     equ     6
 yb_gen      equ     192
 objdir:
-        dc.w    11,7,17,3    ; white
+        dc.w    11,7,17,2    ; green
         dc.w    m_tower_v-meshes,m_tower_f-meshes,m_tower_e-meshes,m_tower_n-meshes
         dc.w    192,198,49,0
         dc.w    0,0,0,0
-        dc.w    7,5,11,3    ; white
+        dc.w    7,5,11,2    ; green
         dc.w    m_block_v-meshes,m_block_f-meshes,m_block_e-meshes,m_block_n-meshes
         dc.w    96,167,136,0
         dc.w    0,0,0,0

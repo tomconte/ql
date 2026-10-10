@@ -83,15 +83,17 @@ MESHES = [
 # ground and lattice cells are 256, so a tower stands well above the
 # eye (top 256 over it), the block's top is seen from above, and the
 # mine floats at eye height (its centre height is the level table's).
+# Colours (spec 5.5): hostiles red, obstacles green, and the generator
+# crystal white -- the only white mesh, so the targets stand out.
 GAME_MESHES = [
-    ("tower", "white",                  # hex prism: vertex radius 48, 384 tall
+    ("tower", "green",                  # hex prism: vertex radius 48, 384 tall
      [(48,-192,0),(24,-192,42),(-24,-192,42),(-48,-192,0),(-24,-192,-42),(24,-192,-42),
       (48,192,0),(24,192,42),(-24,192,42),(-48,192,0),(-24,192,-42),(24,192,-42)],
      [[0,1,2,3,4,5],                    # top cap
       [11,10,9,8,7,6],                  # bottom cap
       [1,0,6,7],[2,1,7,8],[3,2,8,9],[4,3,9,10],[5,4,10,11],[0,5,11,6]]),
 
-    ("block", "white",                  # bunker: a 192 cube, top 64 under the eye
+    ("block", "green",                  # bunker: a 192 cube, top 64 under the eye
      [(-96,-96,-96),(96,-96,-96),(96,96,-96),(-96,96,-96),
       (-96,-96,96),(96,-96,96),(96,96,96),(-96,96,96)],
      [[0,1,2,3],[1,0,4,5],[2,1,5,6],[3,2,6,7],[0,3,7,4],[5,4,7,6]]),

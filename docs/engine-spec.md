@@ -438,14 +438,19 @@ Elements:
 
 | Colour | Used for |
 |---|---|
-| white | structures (towers, blocks), generators and their blips, the windshield crack |
+| white | the generator crystals and their blips (the only white objects), the windshield crack |
 | red | ground lattice; hostiles: enemy gliders, mines, their shots and blips; the low-shield bar and the sight's hit flash; the horizon line when on |
-| green | HUD, sight, radar frame and sweep, energy packs and their blips, player shots |
+| green | HUD, sight, radar frame and sweep, structures (towers, blocks), energy packs and their blips, player shots |
 
 Sparks take the colour of what exploded (section 5.6). Single-plane
 colours are slightly cheaper than white per pixel
 (`docs/vector-perf.md`), so the most numerous moving things are red or
-green.
+green. Structures were white until 2026-10-10 (**decided** then:
+green, so the crystals are the only white objects and stand out). It
+made no measurable difference to the frame: 57.4 -> 57.2 ms at the
+spawn, 47.6 -> 47.3 ms averaged over a full turn (gliders frozen,
+latched 128-loop windows). A distant object's cost is per vertex and
+per face, not per pixel.
 
 ### 5.6 Explosions
 
@@ -518,8 +523,8 @@ whole object per frame (~13 ms, section 9).
   default output is untouched.
 - **Types and meshes** (all convex; genmesh asserts it):
   - tower: hex prism, vertex radius 48, 384 tall (top 256 above the
-    eye; M2), white, obstacle; stops shots.
-  - block: 192 cube bunker, top below the eye (M2 scenery), white,
+    eye; M2), green (white until 2026-10-10), obstacle; stops shots.
+  - block: 192 cube bunker, top below the eye (M2 scenery), green,
     obstacle; stops shots.
   - generator: a white crystal (a tall bipyramid, 384 tall, radius
     96, standing on its lower tip), turning slowly; 5 hits; the
@@ -1002,7 +1007,8 @@ horizon line or skyline; a 3-beat design budget with the game the
 same at any frame rate; no self-modifying code.
 
 **Decided** (v0.3, 2026-10-10): Beta 1 as scoped in section 11.1; the
-working title STARQLIDER; "crystals" on screen; text in vector
+working title STARQLIDER; "crystals" on screen; towers and blocks
+green, the crystals the only white objects; text in vector
 strokes, the in-game readouts in vector-looking bitmap digits
 (section 5.7); out-of-range generators pinned to the radar rim; the
 score values (section 6), no extra craft in the beta; three sectors
