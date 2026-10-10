@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""gencrack - the windshield crack for glider (engine spec 5.4).
+
+When the craft's shield runs out the view freezes and a crack spreads
+over it from an impact point: jagged rays out to the play area's edges
+with a few branches, and two rings of the spider web round the impact.
+The segments are grouped by their distance from the impact into
+CRK_GROUPS groups, drawn one after another (screens.asm, crack), so
+the crack runs outwards. Built in "square" units (a row is 1.5 pixels
+tall on a 4:3 screen) and converted to pixels, every endpoint inside
+the play area (x 0..511, rows PLAYTOP..PLAYBOT), since draw_line does
+not clip.
+
+    python tools/gencrack.py > glider/crack.inc
+    python tools/gencrack.py --png crack.png      # a preview
+
+Seeded: the same build every time. Stdlib only.
+"""
+
+import argparse
+import math
+import random
+import sys
+
+from genfont import line_px, png   # the preview's Bresenham and PNG
+
+SEED = 7
+W, PLAYTOP, PLAYBOT = 512, 28, 239
+ASPECT = 1.5                # a row's height in pixel widths
+IMPACT = (300, 132)         # pixels: right of the sight, under the horizon
+RAYS = 11
+CRK_GROUPS = 8
+
+
+def inside(x, y):
+    return 0 <= x <= W - 1 and PLAYTOP <= y <= PLAYBOT
+
+
+def clip_to_edge(ax, ay, bx, by):
+    """The point where segment a->b (a inside) leaves the play area."""
+    t = 1.0
+    if bx < 0:
+        t = min(t, (0 - ax) / (bx - ax))
+    if bx > W - 1:
+        t = min(t, (W - 1 - ax) / (bx - ax))
+    if by < PLAYTOP:
+        t = min(t, (PLAYTOP - ay) / (by - ay))
+    if by > PLAYBOT:
+        t = min(t, (PLAYBOT - ay) / (by - ay))
+    return ax + (bx - ax) * t, ay + (by - ay) * t
+
+
+def walk(rng, x, y, ang, steps, grow):
+    """A jagged polyline from (x, y) in square units heading ang: its
+    points, stopped at the play area's edge."""
+    pts = [(x, y)]
+    seg = 7.0
+    heading = ang
+    for _ in range(steps):
+        ang += rng.uniform(-0.4, 0.4)
+        ang = heading + 0.5 * (ang - heading)   # jagged, but no drift
+        nx, ny = x + seg * math.cos(ang), y + seg * math.sin(ang)
+        px, py = nx, ny / ASPECT
+        if not inside(px, py):
+            cx, cy = clip_to_edge(x, y / ASPECT, px, py)
+            pts.append((cx, cy * ASPECT))
+            break
+        pts.append((nx, ny))
+        x, y = nx, ny
+        seg *= grow
+    return pts
+
+
+def build():
+    rng = random.Random(SEED)
+    ix, iy = IMPACT[0], IMPACT[1] * ASPECT
+    segs = []                       # (distance from impact, (x0,y0,x1,y1))
+    rays = []
+    base = rng.uniform(0, 2 * math.pi)
+    for i in range(RAYS):
+        ang = base + 2 * math.pi * i / RAYS + rng.uniform(-0.25, 0.25)
+        pts = walk(rng, ix, iy, ang, 40, 1.22)
+        rays.append(pts)
+        for a, b in zip(pts, pts[1:]):
+            segs.append((a, b))
+        for k in range(2, len(pts) - 1):        # branches
+            if rng.random() < 0.28:
+                bx, by = pts[k]
+                side = rng.choice((-1, 1))
+                bang = math.atan2(pts[k][1] - pts[k - 1][1],
+                                  pts[k][0] - pts[k - 1][0]) + side * rng.uniform(0.5, 0.9)
+                br = walk(rng, bx, by, bang, rng.randint(1, 3), 1.15)
+                for a, b in zip(br, br[1:]):
+                    segs.append((a, b))
+    for radius in (20, 50, 95):                 # the web's rings
+        ring = []
+        for pts in rays:
+            for p in pts:
+                if math.hypot(p[0] - ix, p[1] - iy) >= radius:
+                    ring.append(p)
+                    break
+        for k in range(len(ring)):
+            if rng.random() < 0.8:
+                a, b = ring[k], ring[(k + 1) % len(ring)]
+                mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+                dx, dy = mx - ix, my - iy
+                bend = rng.uniform(-0.12, 0.05)         # sag inwards
+                m = (mx + dx * bend, my + dy * bend)
+                segs.append((a, m))
+                segs.append((m, b))
+    out = []
+    for a, b in segs:
+        x0, y0 = round(a[0]), round(a[1] / ASPECT)
+        x1, y1 = round(b[0]), round(b[1] / ASPECT)
+        x0, x1 = min(max(x0, 0), W - 1), min(max(x1, 0), W - 1)
+        y0, y1 = min(max(y0, PLAYTOP), PLAYBOT), min(max(y1, PLAYTOP), PLAYBOT)
+        if (x0, y0) == (x1, y1):
+            continue
+        d = min(math.hypot(a[0] - ix, a[1] - iy), math.hypot(b[0] - ix, b[1] - iy))
+        out.append((d, (x0, y0, x1, y1)))
+    dmax = max(d for d, _ in out)
+    groups = [[] for _ in range(CRK_GROUPS)]
+    for d, s in out:
+        g = min(CRK_GROUPS - 1, int(CRK_GROUPS * (d / dmax) ** 0.7))
+        groups[g].append(s)
+    for g in groups:
+        assert g, "an empty group: change the seed"
+        for x0, y0, x1, y1 in g:
+            assert inside(x0, y0) and inside(x1, y1)
+    return groups
+
+
+def emit(groups):
+    total = sum(len(g) for g in groups)
+    print(f"; crack.inc -- the windshield crack (generated by "
+          f"tools/gencrack.py, seed {SEED}:")
+    print("; edit there). crk_groups groups of white segments, from the")
+    print("; impact outwards: per group a count word, then x0,y0,x1,y1 per")
+    print("; segment, every end inside the play area. "
+          f"{total} segments.")
+    print(f"crk_groups  equ     {len(groups)}")
+    print("crk_data:")
+    for i, g in enumerate(groups):
+        print(f"        dc.w    {len(g)}                   ; group {i}")
+        for s in g:
+            print(f"        dc.w    {','.join(map(str, s))}")
+
+
+def preview(groups, path):
+    w, h = 512, 256
+    pix = [[(0, 0, 0)] * w for _ in range(h)]
+    shade = [(255, 255, 255)] * len(groups)
+    for g, col in zip(groups, shade):
+        for x0, y0, x1, y1 in g:
+            for x, y in line_px(x0, y0, x1, y1):
+                pix[y][x] = col
+    png(path, [row for row in pix for _ in (0, 1)], w, 2 * h)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--png", help="write a preview instead of the tables")
+    args = ap.parse_args()
+    groups = build()
+    print("; crack: " + ", ".join(str(len(g)) for g in groups)
+          + " segments per group", file=sys.stderr)
+    if args.png:
+        preview(groups, args.png)
+    else:
+        emit(groups)
+
+
+if __name__ == "__main__":
+    main()

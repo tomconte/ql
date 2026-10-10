@@ -25,8 +25,8 @@ section 11.1) turns this into a game for testers: a title screen,
 three craft per game, game over and back to the title, a pause, all
 text in vector letters (`lib/draw_text.asm`), the score, the crystals
 left and the spare craft in the strip, the crystals out of radar range
-pinned to its rim; the windshield crack, the warp and more sectors are
-next. The build is the beta's
+pinned to its rim, the windshield crack; the warp and more sectors
+are next. The build is the beta's
 by default: `dev` in `equates.inc` brings back the development band.
 
 ## Build and run
@@ -58,8 +58,9 @@ spare craft), the radar in the middle (the view wedge, a sweep, a red
 blip for every mine and glider and a white one for every crystal
 within 2304 units -- the ones further away sit on the rim, in their
 direction), and at the right the crystals left and the score (mine
-50, dart 100, wedge 200, kite 300, crystal 1000). The sight flashes red when you lose
-shield. A dart dies to 1 hit, a wedge 2, a kite 3, a generator 5.
+50, dart 100, wedge 200, kite 300, crystal 1000). The sight flashes
+red when you lose shield; when it runs out, the windshield cracks. A
+dart dies to 1 hit, a wedge 2, a kite 3, a crystal 5.
 
 In a `dev` build the band at the bottom shows speed and drift (tenths
 of a unit per beat), heading and the number of objects drawn. The

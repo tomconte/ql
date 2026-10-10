@@ -17,11 +17,14 @@ meshes.inc: ../tools/genmesh.py
 sparks.inc: ../tools/gensparks.py
 	python ../tools/gensparks.py > sparks.inc
 
+crack.inc: ../tools/gencrack.py ../tools/genfont.py
+	python ../tools/gencrack.py > crack.inc
+
 # Every source here and in lib/, so a new include file needs no edit
 # (a spare rebuild costs ~40 ms). The generated tables are named too:
 # after a clean the wildcard can't see them, and they must be rebuilt.
 SRCS := $(sort $(wildcard *.asm *.inc ../lib/*.asm) sin.inc meshes.inc sparks.inc \
-        ../lib/vfont.inc)
+        crack.inc ../lib/vfont.inc)
 
 # Register contracts (CLAUDE.md) are checked before every assembly; a
 # problem stops the build. "make check" runs the check alone.
@@ -57,6 +60,6 @@ shot: $(NAME).qlpak
 	python ../tools/qlshot.py run $(NAME).qlpak --wait $(SHOTWAIT) --close $(if $(PEEK),--peek $(PEEK))
 
 clean:
-	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).lst, $(NAME).qlpak, $(NAME).mdv, qlshot.png, sin.inc, meshes.inc, sparks.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).lst, $(NAME).qlpak, $(NAME).mdv, qlshot.png, sin.inc, meshes.inc, sparks.inc, crack.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
 
 .PHONY: all check mdv run runmdv shot clean

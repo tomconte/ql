@@ -123,6 +123,8 @@ hurt_t: dc.w    0                   ; beats since a hit, counting down
 event:  dc.w    0                   ; ev_*, 0 = none
 hud_chg:
         dc.w    0                   ; nonzero: redraw the strip's readouts
+crk_mir:
+        dc.w    0                   ; nonzero: the last crack was mirrored
 craft_n:
         dc.w    0
 score:  dc.l    0

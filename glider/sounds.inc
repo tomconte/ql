@@ -12,3 +12,4 @@ sfx_tab:
         dc.b    180,200,8,0,$00,$0c,$10,$8c ; dmg: a buzz, 220 ms
         dc.b    100,220,30,0,$00,$18,$10,$ff ; boom: noise, 440 ms
         dc.b    140,250,60,0,$00,$30,$10,$ff ; big: deeper, 0.9 s
+        dc.b    20,90,6,0,$00,$28,$10,$ff   ; crack: a high crash, 0.7 s

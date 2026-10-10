@@ -202,6 +202,7 @@ sfx_hit     equ     3               ; a hit that did not destroy
 sfx_dmg     equ     4               ; the craft loses shield
 sfx_boom    equ     5               ; an explosion
 sfx_big     equ     6               ; a generator's
+sfx_crack   equ     7               ; the windshield (Beta 1)
 
 ; ----- the game flow (Beta 1, spec 11.1): title -> sector card -> play;
 ; at zero shield the next craft or, after the last, game over -> title.
@@ -216,6 +217,8 @@ ncraft      equ     3               ; craft per game
 ev_lost     equ     1               ; event: the craft is lost
 ev_pause    equ     2               ; event: Esc, pause
 card_f      equ     75              ; frames a sector card shows
+crk_gap     equ     3               ; frames between the crack's groups
+crk_hold    equ     100             ; frames the cracked view holds
 over_f      equ     150             ; frames GAME OVER shows
 ; text sizes for lib/draw_text.asm (px per grid unit across; rows down
 ; are 2/3 of it, so the letters keep their shape): the title and the

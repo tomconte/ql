@@ -231,6 +231,47 @@ pause:
         dbf     d0,.clr
         rts
 
+; ---------------------------------------------------------------- crack run
+; crack_run: the windshield cracks over the frozen view (spec 5.4): the
+; shown screen gets crack.inc's groups of white segments crk_gap frames
+; apart, from the impact outwards, mirrored on every other craft, with
+; the crack's sound; then it holds crk_hold frames. Called after the
+; flip, so the shown buffer is the one d7 is not.
+; In:      d7 = back buffer index
+; Out:     crk_mir, sfx_want (sent)
+; Trashes: d0-d6, a0, a1, a3-a5
+crack_run:
+        lea     scr0,a4             ; the shown one
+        tst.w   d7
+        bne.s   .s0
+        lea     scr1,a4
+.s0:    lea     sfx_want(pc),a3     ; the sound
+        move.b  #sfx_crack,(a3)
+        bsr     sfx_play
+        lea     crk_mir(pc),a0      ; every other one mirrored
+        not.w   (a0)
+        lea     crk_data(pc),a5
+        move.w  #crk_groups-1,-(sp)
+.grp:   move.w  (a5)+,d6            ; the group's segments
+        bra.s   .sege
+.seg:   movem.w (a5)+,d0-d3         ; x0, y0, x1, y1
+        move.w  crk_mir(pc),d4
+        beq.s   .nm
+        neg.w   d0                  ; x -> 511 - x
+        add.w   #511,d0
+        neg.w   d2
+        add.w   #511,d2
+.nm:    moveq   #col_white,d4
+        bsr     draw_line
+.sege:  dbf     d6,.seg
+        moveq   #crk_gap,d0
+        bsr     hold
+        subq.w  #1,(sp)
+        bpl.s   .grp
+        addq.l  #2,sp
+        move.w  #crk_hold,d0
+        bra     hold                ; tail call
+
 ; ------------------------------------------------------------- text helpers
 ; big_white: a string centred, in white big letters (tx_big).
 ; In:      a0 = the string, d1.w = y, a4 = screen base

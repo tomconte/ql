@@ -1040,6 +1040,16 @@ sweep list, white. Measured: ~0.5 ms per crystal out of range (the
 spawn view with three: 57.4 ms, still a 3-beat loop; a full turn
 45.2 ms); it falls as crystals go.
 
+Then the windshield crack (`crack_run` in `screens.asm`): the event
+handler draws `crack.inc` onto the shown screen -- `tools/gencrack.py`
+(seeded, `--png` previews): 11 jagged rays from an impact right of
+the sight out to the play area's edges, branches, and three rings of
+the web, 222 white segments in 8 groups by distance from the impact,
+3 frames apart, so the crack runs outwards in about half a second;
+every other one mirrored (x -> 511 - x); a crash on the 8049
+(`sfx_crack`, untuned); then 2 s of the cracked view before the next
+craft or game over.
+
 ## 12. Decisions and open questions
 
 **Decided** (v0.1): first-person, craft never drawn; yaw only, no
