@@ -886,16 +886,17 @@ unit (its include order is the memory layout) plus the job header,
 takeover and frame loop; the loop's stages are once-per-frame
 routines (2026-09-29): `lattice.asm`, `objects.asm`, the erase
 stages in `render.asm` with the projection and clipping helpers;
-then `flight.asm`, `hud.asm`, and the non-code in `equates.inc` (tuning
-knobs, record offsets), `macros.inc`, `vars.inc`, `level.inc`,
-`meshes.inc` (`tools/genmesh.py --game`: world-scale meshes, face
-planes, extended directory) and `sin.inc`; then `boot`, `.QCF`,
-`Makefile` with `NAME`, `DATASPACE`, `run`, `mdv`, `runmdv` targets.
-Include order: `../lib/ipc_sound_takeover.asm`,
-`../lib/ipc_keys_takeover.asm`, `../lib/draw_line_w.asm`,
-`../lib/draw_line.asm`, `../lib/draw_dec.asm`. Level tables start as
-hand-written `dc.w` blocks; a `tools/genlevel.py` follows once the
-format settles. Absolute pointers in data are forbidden (flat PIC):
+then `flight.asm`, `hud.asm`, the game flow's `flow.asm` and
+`screens.asm` (Beta 1), and the non-code in `equates.inc` (tuning
+knobs, record offsets), `macros.inc`, `vars.inc`, `levels.inc`
+(`tools/genlevel.py`: the sectors; `level.inc`'s hand-written table
+until Beta 1), `meshes.inc` (`tools/genmesh.py --game`: world-scale
+meshes, face planes, extended directory, points), `crack.inc`
+(`tools/gencrack.py`) and `sin.inc`; then `boot`, `.QCF`, `Makefile`
+with `NAME`, `DATASPACE`, `run`, `mdv`, `runmdv` targets. Include
+order: `../lib/ipc_sound_takeover.asm`, `../lib/ipc_keys_takeover.asm`,
+`../lib/draw_line_w.asm`, `../lib/draw_line.asm`,
+`../lib/draw_dec.asm`, `../lib/draw_text.asm` with `../lib/vfont.inc`. Absolute pointers in data are forbidden (flat PIC):
 initialise with `lea label(pc)` at runtime. No self-modifying code
 (section 2.1).
 
@@ -1049,6 +1050,25 @@ the web, 222 white segments in 8 groups by distance from the impact,
 every other one mirrored (x -> 511 - x); a crash on the 8049
 (`sfx_crack`, untuned); then 2 s of the cracked view before the next
 craft or game over.
+
+Then the sectors and the warp. `tools/genlevel.py` writes
+`levels.inc` (it replaces `level.inc`): a directory (per sector the
+table's offset, the spawn, the launch delay) and the tables -- sector
+1 the M3 test sector verbatim (as played), sectors 2 and 3 generated
+by its rules (seeds 23, 41: 4 and 5 crystals, 9 and 11 mines, launch
+delays 420 and 350 beats; `--png` draws the maps). `sector_load`
+takes the sector's record; `warp_check` (after `gen_step`) arms the
+warp when the last crystal goes -- 50 beats with the craft unhurt
+(`shield_add` ignores losses), then `ev_warp`; `warp_run` runs the
+loop's erase, lattice and radar only for 75 frames, the camera moved
+24 -> 120 units a frame (+4 a frame), each flip at a fresh edge (the
+assembler fails the build if `warp_max` reaches `latd`/2);
+`sector_next` scores the bonus, shown on the next card, and steps the
+table, or past the third cuts the delay by 50 (to 200). `craft_start`
+refills the shield, so a warp does too. Unattended: `test_warp` (the
+crystals start destroyed: the game warps through the sectors), and a
+soak run (Space + Right held, 80 s: points, a craft lost, the next
+one) went through cleanly.
 
 ## 12. Decisions and open questions
 

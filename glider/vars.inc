@@ -125,6 +125,23 @@ hud_chg:
         dc.w    0                   ; nonzero: redraw the strip's readouts
 crk_mir:
         dc.w    0                   ; nonzero: the last crack was mirrored
+; the sector: its index in sec_dir (levels.inc), its entity table, the
+; launch delay, the spawn (16.8 x, z: craft_reset copies them), the cut
+; to the delay past the last table, the bonus shown on the next card
+; (packed BCD), the warp's countdown (beats; -1 once raised) and speed
+sect_i: dc.w    0
+lvl_ptr:
+        dc.l    0
+gen_dly:
+        dc.w    0
+spn_px: dc.l    0
+spn_pz: dc.l    0
+spn_h:  dc.w    0
+dly_cut:
+        dc.w    0
+bonus:  dc.l    0
+warp_t: dc.w    0
+warp_v: dc.w    0
 craft_n:
         dc.w    0
 score:  dc.l    0

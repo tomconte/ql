@@ -179,11 +179,11 @@ alert_r     equ     1800            ; a patrolling glider attacks inside this
 lose_r      equ     3500            ; an attacking one gives up beyond this
 patrol_r    equ     600             ; the patrol wheels round inside this
 ; generators (spec 6): each launches up to gen_own gliders of its own
-; (under the ngl cap), one every gen_delay beats, the types in turn; it
+; (under the ngl cap), one every gen_dly beats (the sector's launch
+; delay, levels.inc: 500 = 10 s in sector 1), the types in turn; it
 ; turns gen_spin a beat. At most ngen per sector.
 ngen        equ     8
 gen_own     equ     2
-gen_delay   equ     500             ; 10 s
 gen_spin    equ     64              ; 0.25 brad a beat: a turn in 20 s
 ; enemy shots (spec 7): up to neshots in flight, eshot_v units a beat for
 ; eshot_life beats (range 1800), launched eshot_nose ahead of the hull
@@ -203,6 +203,7 @@ sfx_dmg     equ     4               ; the craft loses shield
 sfx_boom    equ     5               ; an explosion
 sfx_big     equ     6               ; a generator's
 sfx_crack   equ     7               ; the windshield (Beta 1)
+sfx_warp    equ     8               ; the warp (Beta 1)
 
 ; ----- the game flow (Beta 1, spec 11.1): title -> sector card -> play;
 ; at zero shield the next craft or, after the last, game over -> title.
@@ -216,9 +217,27 @@ dev         equ     0               ; 1 = the development build: the HUD
 ncraft      equ     3               ; craft per game
 ev_lost     equ     1               ; event: the craft is lost
 ev_pause    equ     2               ; event: Esc, pause
+ev_warp     equ     3               ; event: the sector cleared, the warp
 card_f      equ     75              ; frames a sector card shows
 crk_gap     equ     3               ; frames between the crack's groups
 crk_hold    equ     100             ; frames the cracked view holds
+; the warp (spec 6): warp_b beats after the last crystal goes (its burst
+; plays out, the craft unhurt) the lattice alone streams past for
+; warp_f frames, the camera moving warp_v0 units a frame, +warp_acc a
+; frame up to warp_max -- under latd/2, past which the lattice seems to
+; stand still or run backwards (it repeats every latd)
+warp_b      equ     50
+warp_f      equ     75
+warp_v0     equ     24
+warp_acc    equ     4
+warp_max    equ     120
+        if      warp_max>=latd/2
+        fail    "the warp outruns the lattice (wagon-wheel): keep warp_max < latd/2"
+        endc
+; sectors (levels.inc, tools/genlevel.py): after the last, the last again
+; with the launch delay cut by dly_step each time, down to dly_min
+dly_step    equ     50
+dly_min     equ     200
 over_f      equ     150             ; frames GAME OVER shows
 ; text sizes for lib/draw_text.asm (px per grid unit across; rows down
 ; are 2/3 of it, so the letters keep their shape): the title and the
@@ -245,8 +264,10 @@ no_gls      equ     0               ; skip the gliders' and their shots'
 no_gld      equ     0               ; skip the moving entities (gliders) in
                                     ; the object stage (not drawn, no blip)
 no_snd      equ     0               ; skip the sound effects
-; the spawn point (M4: per sector): between four lattice points, looking
-; along +z. Moved for unattended tests, e.g. in front of a tower.
+; the spawn point comes with the sector (levels.inc); test_spawn = 1
+; puts the craft at spawn_x/z/head instead, for unattended tests (e.g.
+; in front of a crystal). gl_test places its gliders from these too.
+test_spawn  equ     0
 spawn_x     equ     latd/2
 spawn_z     equ     latd/2
 spawn_head  equ     0               ; 8.8 brads
@@ -264,6 +285,9 @@ test_auto   equ     0
 ; test_shield: the shield each craft starts with (0 = shield_max): 1
 ; with test_gl loses craft fast, for the flow to game over
 test_shield equ     0
+; test_warp: every sector starts with its crystals destroyed, so each
+; warps a second in -- the warp, the cards and the tables, unattended
+test_warp   equ     0
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x, 0..sector-1

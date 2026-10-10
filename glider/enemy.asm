@@ -613,7 +613,8 @@ eshots_step:
 ; launch timer (e_tmr) has run out launches a glider from its centre
 ; along its heading -- if fewer than gen_own of its own fly and a slot
 ; is free (the ngl cap) -- the types in turn (gl_next), then waits
-; gen_delay beats; one that cannot launch tries again next frame.
+; gen_dly beats (the sector's); one that cannot launch tries again next
+; frame.
 ; In:      none
 ; Out:     the generators' e_head, e_tmr; gliders launched (glpool,
 ;          their entities, gl_next, gl_phase)
@@ -655,7 +656,7 @@ gen_step:
         move.w  e_head(a3),d2
         bsr     glider_launch
         bcs.s   .gend               ; all ngl up: next frame
-        move.w  #gen_delay,e_tmr(a3)
+        move.w  gen_dly(pc),e_tmr(a3)
         lea     gl_next(pc),a0
         addq.w  #1,(a0)
         cmp.w   #(gltypes_e-gltypes)/gt_size,(a0)

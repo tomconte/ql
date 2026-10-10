@@ -24,4 +24,6 @@ tx_score:
         dc.b    'SCORE ',0
 tx_paused:
         dc.b    'PAUSED',0
+tx_bonus:
+        dc.b    'BONUS ',0
         even

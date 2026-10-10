@@ -152,9 +152,10 @@ title_screen:
         bra     key_wait            ; tail call
 
 ; --------------------------------------------------------------- sector card
-; sector_card: SECTOR n on a black screen 0 for card_f frames.
+; sector_card: SECTOR n on a black screen 0 for card_f frames, and
+; under it the last sector's bonus when there is one (sector_next).
 ; In:      none
-; Out:     txtbuf
+; Out:     txtbuf, bonus cleared
 ; Trashes: d0-d5, a0-a2, a4, dtx_ws
 sector_card:
         bsr     scr_clear
@@ -170,8 +171,87 @@ sector_card:
         lea     txtbuf(pc),a0
         moveq   #104,d1
         bsr     big_white
-        move.w  #card_f,d0
+        move.l  bonus(pc),d0
+        beq.s   .nb
+        lea     txtbuf(pc),a0       ; BONUS 2000
+        lea     tx_bonus(pc),a1
+        bsr     str_put
+        lea     bonus+1(pc),a1
+        moveq   #3,d0
+        moveq   #1,d1
+        bsr     bcd_put
+        lea     txtbuf(pc),a0
+        move.w  #144,d1
+        bsr     med_green
+        lea     bonus(pc),a0
+        clr.l   (a0)
+.nb:    move.w  #card_f,d0
         bra     hold                ; tail call
+
+; ----------------------------------------------------------------- warp run
+; warp_run: the warp out of a cleared sector (spec 6): the controls
+; locked, the objects gone (no longer drawn: their erase boxes clear
+; them within two frames), the sight off, and only the lattice streaming
+; past for warp_f frames, the camera moved along the heading warp_v
+; units a frame, from warp_v0 by warp_acc up to warp_max -- per frame,
+; not per beat: nothing plays, and a frame's move must stay under the
+; lattice's wagon-wheel limit (latd/2) whatever the frame takes. The
+; loop's stages minus the simulation, objects, shots and sparks; each
+; flip at a fresh frame edge. Then the caller blacks out for the card.
+; In:      d7 = back buffer index
+; Out:     d7 (flipped warp_f times), craft (moved), the screens,
+;          sight_col, warp_v, sfx_want (sent)
+; Trashes: d0-d6, a0-a6
+warp_run:
+        lea     sight_col(pc),a0    ; the sight goes
+        clr.b   (a0)
+        lea     sfx_want(pc),a3     ; the sound
+        move.b  #sfx_warp,(a3)
+        bsr     sfx_play
+        lea     warp_v(pc),a0
+        move.w  #warp_v0,(a0)
+        move.w  #warp_f-1,-(sp)
+.frame: lea     scr0,a4             ; a4 = back buffer base
+        tst.w   d7
+        beq.s   .bb
+        lea     scr1,a4
+.bb:    bsr     erase_boxes
+        bsr     bbox_sel            ; done with: no objects to draw, so
+        clr.w   (a6)                ; nothing rebuilds the list
+        bsr     erase_dots
+        bsr     sight_erase
+        bsr     dots_open
+        lea     craft(pc),a0        ; the camera on: v*sin, v*cos in 16.8
+        move.w  warp_v(pc),d0
+        move.w  c_s(a0),d1
+        muls.w  d0,d1
+        add.l   d1,c_px(a0)
+        andi.l  #(sector<<8)-1,c_px(a0)
+        move.w  c_c(a0),d1
+        muls.w  d0,d1
+        add.l   d1,c_pz(a0)
+        andi.l  #(sector<<8)-1,c_pz(a0)
+        add.w   #warp_acc,d0        ; faster
+        cmp.w   #warp_max,d0
+        ble.s   .vm
+        move.w  #warp_max,d0
+.vm:    lea     warp_v(pc),a0
+        move.w  d0,(a0)
+        bsr     lattice
+        bsr     sight_draw          ; (off: noted as shown nowhere)
+        ifeq    no_rad
+        bsr     radar               ; the sweep goes on
+        endc
+        move.b  #1<<pc__frame,pc_intr   ; an edge the work spanned: gone;
+        bsr     frame_wait              ; the flip waits for a fresh one
+        move.w  d7,d0
+        ror.b   #1,d0               ; 0 -> $00, 1 -> $80
+        move.b  d0,mc_stat
+        eori.w  #1,d7
+        subq.w  #1,(sp)
+        bpl     .frame
+        addq.l  #2,sp
+        rts
 
 ; --------------------------------------------------------------- over screen
 ; over_screen: the game's score kept (the last one, and the best if it

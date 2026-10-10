@@ -162,12 +162,18 @@ shield_check:
 ; --------------------------------------------------------------- shield add
 ; shield_add: the shield changes by d2.w (signed, capped at shield_max;
 ; shield_check deals with zero), marked for shield_check; a loss starts
-; the hurt timer, turns the sight red and asks for the damage sound.
+; the hurt timer, turns the sight red and asks for the damage sound --
+; except with the warp coming (warp_t: the sector is won).
 ; In:      d2.w = the change
 ; Out:     shield, shield_chg, hurt_t, sight_col, sfx_want
 ; Trashes: a3
 shield_add:
-        lea     shield(pc),a3
+        tst.w   d2
+        bpl.s   .s0
+        lea     warp_t(pc),a3
+        tst.w   (a3)
+        bne.s   .s2                 ; the warp is coming: unhurt
+.s0:    lea     shield(pc),a3
         add.w   d2,(a3)
         cmp.w   #shield_max,(a3)
         ble.s   .s1

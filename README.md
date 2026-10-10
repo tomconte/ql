@@ -114,6 +114,8 @@ tools/
   gensparks.py    glider's explosion bursts, precomputed per beat
   genfont.py      the vector font: glyphs as strokes, emitted for
                   draw_text, rasterized for draw_bcd; --png previews
+  gencrack.py     glider's windshield crack, segments in groups
+  genlevel.py     glider's sectors: entity tables + directory; --png maps
   regcheck.py     register-contract checker, run by make before vasm
   qlshot.py       screenshots + memory peeks of a running Q-emuLator,
                   read from the process (make shot)

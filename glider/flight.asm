@@ -145,18 +145,18 @@ flight_step:
         rts
 
 ; -------------------------------------------------------------- craft reset
-; craft_reset: spawn at (spawn_x, spawn_z) looking along spawn_head, at
-; rest.
+; craft_reset: at the sector's spawn point (spn_px, spn_pz: sector_load)
+; looking along spn_h, at rest.
 ; In:      none
 ; Out:     a0 = craft, the record reset
 ; Trashes: none
 craft_reset:
         lea     craft(pc),a0
-        move.l  #(spawn_x&(sector-1))<<8,c_px(a0)
-        move.l  #(spawn_z&(sector-1))<<8,c_pz(a0)
+        move.l  spn_px(pc),c_px(a0)
+        move.l  spn_pz(pc),c_pz(a0)
         move.l  c_px(a0),c_ox(a0)
         move.l  c_pz(a0),c_oz(a0)
-        move.w  #spawn_head,c_head(a0)
+        move.w  spn_h(pc),c_head(a0)
         clr.w   c_turn(a0)
         clr.w   c_vx(a0)
         clr.w   c_vz(a0)
