@@ -48,6 +48,16 @@ mdv: $(NAME).mdv
 $(NAME).mdv: $(NAME)_bin boot ../tools/mkmdv.py
 	python ../tools/mkmdv.py --name $(NAME) --dataspace $(DATASPACE)
 
+# The beta for testers (spec 11.1): the .qlpak and the .mdv (medium
+# STARQLIDER) under the game's name, with BETA.txt as README.txt, in
+# release/ and zipped. Build with dev and every test_* flag at 0.
+REL := starqlider
+release: $(NAME).qlpak $(NAME)_bin boot BETA.txt ../tools/mkmdv.py
+	pwsh -NoProfile -Command "New-Item -ItemType Directory -Force release | Out-Null; Copy-Item $(NAME).qlpak release/$(REL).qlpak; Copy-Item BETA.txt release/README.txt"
+	python ../tools/mkmdv.py --name $(NAME) --dataspace $(DATASPACE) --label STARQLIDER --out release/$(REL).mdv
+	python ../tools/mkmdv.py --verify release/$(REL).mdv
+	pwsh -NoProfile -Command "Compress-Archive -Force -Path release/$(REL).qlpak,release/$(REL).mdv,release/README.txt -DestinationPath release/$(REL)-beta1.zip"
+
 run: $(NAME).qlpak
 	pwsh -NoProfile -Command "Start-Process -FilePath '$(QEMU)' -ArgumentList '$(NAME).qlpak'"
 
@@ -63,6 +73,6 @@ shot: $(NAME).qlpak
 	python ../tools/qlshot.py run $(NAME).qlpak --wait $(SHOTWAIT) --close $(if $(PEEK),--peek $(PEEK))
 
 clean:
-	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).lst, $(NAME).qlpak, $(NAME).mdv, qlshot.png, sin.inc, meshes.inc, sparks.inc, crack.inc, levels.inc -ErrorAction SilentlyContinue; Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue"
+	pwsh -NoProfile -Command "Remove-Item $(NAME)_bin, $(NAME).lst, $(NAME).qlpak, $(NAME).mdv, qlshot.png, sin.inc, meshes.inc, sparks.inc, crack.inc, levels.inc -ErrorAction SilentlyContinue; Remove-Item stage, release -Recurse -Force -ErrorAction SilentlyContinue"
 
-.PHONY: all check mdv run runmdv shot clean
+.PHONY: all check mdv release run runmdv shot clean

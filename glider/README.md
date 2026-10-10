@@ -36,6 +36,8 @@ by default: `dev` in `equates.inc` brings back the development band.
 make          # check the register contracts, assemble, package glider.qlpak
 make run      # launch Q-emuLator (close it before rebuilding)
 make mdv      # glider.mdv, a Microdrive image for real hardware and FPGA cores
+make release  # the beta for testers: release/starqlider-beta1.zip (.qlpak,
+              # .mdv and BETA.txt as README.txt)
 make runmdv   # boot the .mdv in Q-emuLator
 make check    # the register-contract check alone
 ```

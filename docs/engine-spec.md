@@ -1070,6 +1070,17 @@ crystals start destroyed: the game warps through the sectors), and a
 soak run (Space + Right held, 80 s: points, a craft lost, the next
 one) went through cleanly.
 
+Packaging: `make release` in `glider/` puts the `.qlpak` and an
+`.mdv` with the medium name STARQLIDER (verified by `mkmdv.py
+--verify`) under the game's name in `release/`, with `BETA.txt` (the
+tester note: running it, the goal, controls, scoring, known issues,
+the feedback wanted) as `README.txt`, and zips them
+(`starqlider-beta1.zip`). Both packages boot to the title in
+Q-emuLator (the `.mdv` through the ROM's Microdrive driver: ~20 s).
+Left to the user before it goes out: playing it on Q-emuLator and the
+NanoQL core, the ear pass on the sounds, the tag and where it is
+published.
+
 ## 12. Decisions and open questions
 
 **Decided** (v0.1): first-person, craft never drawn; yaw only, no

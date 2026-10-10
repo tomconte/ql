@@ -1,0 +1,72 @@
+STARQLIDER -- beta 1                                       2026-10-10
+====================
+
+A first-person wireframe hovercraft raid for the Sinclair QL, written
+for a stock machine: 68008 at 7.5 MHz, 128K, mode 4. Thank you for
+trying it!
+
+
+RUNNING IT
+
+- Q-emuLator (Windows, Mac): open starqlider.qlpak. The package sets
+  up a 128K QL at the original speed and boots the game.
+- A real QL, a vDriveQL, the ZX Spectrum Next or MiSTer QL cores, or
+  another emulator: starqlider.mdv is a Microdrive image. Put it in
+  mdv1 and boot (the boot file runs mdv1_glider_bin).
+
+The game takes the whole machine over: to quit, reset it.
+
+
+THE GAME
+
+Destroy every white crystal in the sector. The crystals launch red
+enemy gliders that defend them. The radar at the top shows the
+gliders and mines in red and the crystals in white; crystals out of
+radar range sit on its rim, in their direction. The count of crystals
+left is at the top right, next to the score.
+
+When the last crystal goes, you warp to the next sector, harder than
+the last. Your shield (the bar at the top left) refills at each warp.
+Bumping into things, mines and enemy fire wear it down; at zero the
+windshield cracks and you lose a craft. Three craft per game (the
+spares are the small deltas under the shield bar).
+
+
+CONTROLS
+
+  Left / Right   turn
+  Up             thrust
+  Down           brake; keep it held at a standstill to reverse
+  Space          fire (hold it down for autofire)
+  Esc            pause
+
+A joystick in CTL1 plays the whole game (it is the arrows and Space).
+The craft drifts: velocity lags the heading, so turning at speed
+slides you sideways. That is the game's feel, not a bug.
+
+
+SCORING
+
+  mine 50, dart 100, wedge 200, kite 300, crystal 1000,
+  and 1000 x the sector number for clearing a sector.
+
+
+KNOWN ISSUES
+
+- Busy scenes drop to 10-12 frames a second (the target is 16.7).
+- Enemy gliders fly through obstacles and through each other.
+- On the MiSTer QL core the wireframes flicker: a core bug, reported
+  upstream.
+- The sounds are first drafts.
+- The high score is not saved (the game runs without the QL's
+  operating system).
+
+
+FEEDBACK WANTED
+
+- What you played it on.
+- Did you understand what to do without reading this note?
+- Too hard, too easy? How does the speed feel?
+- Anything that looked broken (a photo of the screen helps).
+
+Reply to whoever sent you this. Thanks!

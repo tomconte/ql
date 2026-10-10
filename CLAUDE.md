@@ -46,6 +46,11 @@ flat binary, PC-relative code only (no relocation). The packaging step
 the 30-byte `]!QDOS File Header` carrying the QDOS file type and
 dataspace, then zips config + files into a `.qlpak`.
 
+`make release` in `glider/` packages the beta for testers
+(`release/starqlider-beta1.zip`: the `.qlpak`, an `.mdv` with the medium
+name STARQLIDER, `BETA.txt` as `README.txt`); build it with `dev` and
+every `test_*`/`no_*` flag at 0.
+
 `make mdv` (game8, pattern reusable) builds `<name>.mdv` instead — a
 QLay-format Microdrive image via `tools/mkmdv.py` (Python 3, stdlib
 only; builds carry a genuine QDOS directory header with type 1 +
