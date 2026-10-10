@@ -1012,6 +1012,20 @@ count and rim blips; craft and crack; warp, sectors, refill;
 packaging (`.mdv`, `.qlpak`, the tester note, a tag), played on
 Q-emuLator and the NanoQL core.
 
+Built so far (branch `beta`, 2026-10-10): the green structures
+(section 5.5), the font (section 5.7), then the game flow: title,
+sector card, three craft, game over and back to the title, Esc pause
+(PAUSED over the frozen view; its rows cleared on the way out, and the
+buffer's next erase does the rest), the `dev` flag (0 by default:
+the beta). The resets live in `flow.asm`: everything the loop keeps
+between frames is set per game, sector or craft there, not by the
+binary's initial values. Unattended checks: `test_auto` (a key wait
+goes on after that many frames), `test_shield` (the shield each craft
+starts with). Measured with the gliders frozen: without the HUD band
+the spawn view takes 55.9 ms and runs a steady 3-beat loop, where the
+dev build alternates 3 and 4 beats (57.5 ms); a full turn averages
+44.2 ms (47.3).
+
 ## 12. Decisions and open questions
 
 **Decided** (v0.1): first-person, craft never drawn; yaw only, no

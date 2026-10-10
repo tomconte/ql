@@ -116,6 +116,23 @@ shield_chg:
         dc.w    0                   ; nonzero: the shield changed this frame
 hurt_t: dc.w    0                   ; beats since a hit, counting down
 
+; the game flow (flow.asm, screens.asm): the event the loop acts on after
+; the flip, the craft left (this one included), the scores (packed BCD,
+; 6 digits in the low 3 bytes: a long compares like the number), the
+; sector (packed BCD, the low byte), a line of text being put together
+event:  dc.w    0                   ; ev_*, 0 = none
+craft_n:
+        dc.w    0
+score:  dc.l    0
+hiscore:
+        dc.l    0                   ; the session's best (nothing is saved:
+lastscore:                          ;   no QDOS after the takeover)
+        dc.l    0
+sector_n:
+        dc.w    0
+txtbuf: ds.b    40
+        even
+
 ; entity pool (e_* offsets), filled from the level table at start
 entpool:
         ds.b    (nent+1)*e_size

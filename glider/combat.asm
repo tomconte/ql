@@ -141,22 +141,22 @@ craft_hit:
 
 ; ------------------------------------------------------------- shield check
 ; shield_check: after the simulation's beats, act on a shield that
-; changed (shield_add marked it): at zero or less the craft starts over
-; at the spawn with a full shield (a stand-in for M4's windshield crack
-; and the next craft), else its bar is redrawn.
+; changed (shield_add marked it): its bar redrawn, and at zero or less
+; the craft lost -- an event the loop acts on after the flip (the next
+; craft, or game over: spec 11.1).
 ; In:      none
-; Out:     shield_chg cleared; the shield bar; or craft, shield, hurt_t,
-;          sight_col reset
+; Out:     shield_chg cleared; the shield bar; event
 ; Trashes: d0-d4, a0, a1
 shield_check:
         lea     shield_chg(pc),a0
         tst.w   (a0)
         beq.s   .done
         clr.w   (a0)
+        bsr     shield_bar
         move.w  shield(pc),d0
-        bgt     shield_bar          ; tail call
-        bsr     craft_reset
-        bra     shield_reset        ; tail call
+        bgt.s   .done
+        lea     event(pc),a0
+        move.w  #ev_lost,(a0)
 .done:  rts
 
 ; --------------------------------------------------------------- shield add
@@ -190,7 +190,11 @@ shield_add:
 ; Trashes: d0-d4, a0, a1
 shield_reset:
         lea     shield(pc),a0
+        ifne    test_shield
+        move.w  #test_shield,(a0)   ; unattended runs: a short-lived craft
+        else
         move.w  #shield_max,(a0)
+        endc
         lea     hurt_t(pc),a0
         clr.w   (a0)
         lea     sight_col(pc),a0

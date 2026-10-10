@@ -196,8 +196,29 @@ sfx_dmg     equ     4               ; the craft loses shield
 sfx_boom    equ     5               ; an explosion
 sfx_big     equ     6               ; a generator's
 
+; ----- the game flow (Beta 1, spec 11.1): title -> sector card -> play;
+; at zero shield the next craft or, after the last, game over -> title.
+; The loop raises an event and acts on it after the flip.
+dev         equ     0               ; 1 = the development build: the HUD
+                                    ; band (readouts, meters, headroom bar)
+                                    ; and Enter = back to the spawn with a
+                                    ; full shield; 0 = the game as testers
+                                    ; get it. The meters are counted either
+                                    ; way: make shot PEEK="headroom+12:w"
+ncraft      equ     3               ; craft per game
+ev_lost     equ     1               ; event: the craft is lost
+ev_pause    equ     2               ; event: Esc, pause
+card_f      equ     75              ; frames a sector card shows
+over_f      equ     150             ; frames GAME OVER shows
+; text sizes for lib/draw_text.asm (px per grid unit across; rows down
+; are 2/3 of it, so the letters keep their shape): the title and the
+; cards' big words 24 px by 24 rows, the rest 12 by 12
+tx_big      equ     6
+tx_med      equ     3
+pause_y     equ     150             ; PAUSED's top row (big letters)
+
 ; ----- HUD band (rows 240-255): separator 240, readouts 242-246 and
-; 248-252, headroom bar 254-255
+; 248-252, headroom bar 254-255 (dev builds)
 hb_y        equ     254             ; bar top line (2 rows tall)
 hb_shift    equ     4
 mwin        equ     128             ; meter window, loops (power of 2)
@@ -226,6 +247,13 @@ test_keys   equ     0
 ; test_gl: launch a dart, a wedge and a kite ahead of the spawn at start
 ; (gl_test in enemy.asm), until the generators launch them
 test_gl     equ     0
+; test_auto: frames after which a wait for a key (key_wait: the title's
+; Space, the pause's Esc) goes on as if it had come, so the game flow
+; runs unattended; 0 = wait for the key
+test_auto   equ     0
+; test_shield: the shield each craft starts with (0 = shield_max): 1
+; with test_gl loses craft fast, for the flow to game over
+test_shield equ     0
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x, 0..sector-1

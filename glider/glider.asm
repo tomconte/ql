@@ -42,10 +42,13 @@
 ;                projection, clipping
 ;   hud.asm      readouts, meters, meter window, headroom bar, sound
 ;   strip.asm    the sight, the radar (the top strip)
+;   flow.asm     the game flow's resets: game, sector, craft, screens
+;   screens.asm  title, sector card, game over, pause; text helpers
 ;   vars.inc     variables and scratch
 ;   level.inc    static entity table
 ;   types.inc    the enemy glider types
 ;   sounds.inc   the sound effects
+;   texts.inc    the words of the screens around play
 ;   then meshes.inc, sparks.inc and sin.inc (generated), the supervisor
 ;   stack, the
 ;   lib/ routines, and ds_base LAST: QDOS appends the dataspace there.
@@ -75,20 +78,7 @@ main:
         lea     sv_stack_top(pc),sp ; run on our own supervisor stack
 
         move.b  #0,mc_stat          ; mode 4, screen 0 displayed
-
-        lea     scr0,a0             ; clear BOTH screens ($20000-$2FFFF)
-        move.w  #$10000/4-1,d0
-        moveq   #0,d1
-.clr:   move.l  d1,(a0)+
-        dbf     d0,.clr
-
-        lea     scr0+240*scr_llen,a0    ; static HUD separator, both buffers
-        lea     scr1+240*scr_llen,a1
-        moveq   #-1,d1
-        moveq   #32-1,d0
-.sep:   move.l  d1,(a0)+
-        move.l  d1,(a1)+
-        dbf     d0,.sep
+        bsr     scr_clear           ; both screens black
 
 ; ----- projection tables into the dataspace (QDOS appends it to the
 ; code, see ds_base): rowoff[zi] = (horizon + cam_h*yfocal/zi)*128 + 1
@@ -114,53 +104,23 @@ main:
         cmp.w   #ztab,d2
         blt.s   .tab
 
-        lea     level(pc),a0        ; static entities into the pool
-        lea     entpool(pc),a1
-.lvl:   move.w  (a0),d0
-        move.l  (a0)+,(a1)+
-        move.l  (a0)+,(a1)+
-        move.l  (a0)+,(a1)+
-        move.l  (a0)+,(a1)+
-        tst.w   d0
-        bpl.s   .lvl                ; copies the -1 terminator too
-        lea     -e_size(a1),a1      ; then the gliders' entities over it,
-        lea     glpool(pc),a0       ; free (e_flags 0), each paired with
-        moveq   #ngl-1,d0           ; its glider record
-.gle:   move.l  a1,g_ent(a0)
-        move.w  #msh_dart,e_mesh(a1)
-        clr.w   e_flags(a1)
-        lea     e_size(a1),a1
-        lea     g_size(a0),a0
-        dbf     d0,.gle
-        move.w  #-1,e_mesh(a1)      ; the pool's end
-        lea     entpool(pc),a0      ; the generators, listed for gen_step
-        lea     gens+2(pc),a1
-        moveq   #0,d1
-.gsc:   move.w  e_mesh(a0),d0
-        bmi.s   .gsd
-        cmp.w   #msh_gen,d0
-        bne.s   .gsn
-        cmp.w   #ngen,d1
-        bhs.s   .gsn                ; (more than ngen: the rest stay idle)
-        move.l  a0,(a1)+
-        addq.w  #1,d1
-.gsn:   lea     e_size(a0),a0
-        bra.s   .gsc
-.gsd:   lea     gens(pc),a0
-        move.w  d1,(a0)
-        ifne    test_gl
-        bsr     gl_test             ; a dart, a wedge, a kite ahead
-        endc
+        lea     scr0,a4             ; the sweep's pixel lists, once: they
+        bsr     radar_frame         ; leave out the radar frame's pixels,
+        bsr     radar_tabs          ; tested on screen 0
 
-        lea     scr0,a4             ; the radar's static frame, both buffers
-        bsr     radar_frame
-        lea     scr1,a4
-        bsr     radar_frame
-        bsr     radar_tabs          ; the sweep's pixel lists (screen 0)
-        bsr     shield_reset        ; full, and its bar in both screens
-
-        bsr     craft_reset         ; spawn in the open field
-        move.b  #1<<pc__frame,pc_intr   ; discard any pending frame bit
+; ----- the game flow (Beta 1, spec 11.1): the title until Space, a new
+; game, each sector's card, each craft's start, then the frame loop
+; until an event (after the flip, below): the craft lost -> the next
+; one, or game over -> the title; Esc -> pause. The resets are in
+; flow.asm, the screens in screens.asm.
+go_title:
+        bsr     title_screen
+        bsr     game_new
+go_sector:
+        bsr     sector_load
+        bsr     sector_card
+go_craft:
+        bsr     craft_start         ; screens, lists, the craft at the spawn
         moveq   #1,d7               ; back buffer index: screen 1
 
 ; ---------------------------------------------------------------- frame loop
@@ -201,11 +161,18 @@ frame_loop:
         endc
         not.b   d3
         and.b   d0,d3               ; d3 = newly pressed
+        btst    #k1__esc,d3
+        beq.s   .nesc
+        lea     event(pc),a0        ; Esc: pause, after the flip
+        move.w  #ev_pause,(a0)
+.nesc:
+        ifne    dev
         btst    #k1__enter,d3
         beq.s   .nrst
-        bsr     craft_reset         ; Enter: back to the spawn point,
-        bsr     shield_reset        ; the shield full
+        bsr     craft_reset         ; Enter (dev builds): back to the
+        bsr     shield_reset        ; spawn point, the shield full
 .nrst:
+        endc
 
 ; ----- simulation: one step per beat of the previous loop (1..3), so
 ; everything stays defined per 20 ms whatever the frame rate (spec 2.1):
@@ -280,11 +247,13 @@ frame_loop:
 ; are the loop's extra beats;
 ; then wait for the next real edge (flips stay VBL-aligned) and consume
 ; that too so the next loop's count is honest.
+        ifne    dev                 ; the HUD band: dev builds only
         ifeq    no_hud
         bsr     draw_hud
         endc
         bsr     draw_hbar
         bsr     draw_meters
+        endc
         beat_poll
         move.w  xbeats(pc),d6       ; d6 = extra beats of this loop (0..2)
 ; ----- keyboard: one IPC round trip for row 1, after the work and its
@@ -320,7 +289,25 @@ frame_loop:
         ror.b   #1,d0               ; 0 -> $00, 1 -> $80
         move.b  d0,mc_stat
         eori.w  #1,d7               ; other buffer becomes the back one
+
+; ----- events, raised during the frame and acted on here, with the
+; frame shown: Esc pauses (PAUSED over the view until Esc again), the
+; craft lost goes to the next craft, or after the last to game over and
+; the title (spec 11.1).
+        move.w  event(pc),d0
+        bne.s   .ev
         bra     frame_loop
+.ev:    lea     event(pc),a0
+        clr.w   (a0)
+        cmp.w   #ev_pause,d0
+        bne.s   .lost
+        bsr     pause
+        bra     frame_loop
+.lost:  lea     craft_n(pc),a0      ; the craft lost
+        subq.w  #1,(a0)
+        bgt     go_craft            ; the next one
+        bsr     over_screen
+        bra     go_title
 
         include "flight.asm"
         include "combat.asm"
@@ -331,10 +318,13 @@ frame_loop:
         include "render.asm"
         include "hud.asm"
         include "strip.asm"
+        include "flow.asm"
+        include "screens.asm"
         include "vars.inc"
         include "level.inc"
         include "types.inc"
         include "sounds.inc"
+        include "texts.inc"
 
         include "meshes.inc"
         include "sparks.inc"
@@ -354,6 +344,8 @@ sv_stack_top:
         include "../lib/draw_line_w.asm"
         include "../lib/draw_line.asm"
         include "../lib/draw_dec.asm"
+        include "../lib/draw_text.asm"
+        include "../lib/vfont.inc"
 
 ; ---------------------------------------------------------------- dataspace
 ; QDOS places the job's dataspace right after the code, so ds_base (the

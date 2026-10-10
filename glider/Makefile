@@ -8,6 +8,9 @@ all: $(NAME).qlpak
 sin.inc: ../tools/gensin.py
 	python ../tools/gensin.py > sin.inc
 
+../lib/vfont.inc: ../tools/genfont.py
+	python ../tools/genfont.py -o $@
+
 meshes.inc: ../tools/genmesh.py
 	python ../tools/genmesh.py --game > meshes.inc
 
@@ -17,7 +20,8 @@ sparks.inc: ../tools/gensparks.py
 # Every source here and in lib/, so a new include file needs no edit
 # (a spare rebuild costs ~40 ms). The generated tables are named too:
 # after a clean the wildcard can't see them, and they must be rebuilt.
-SRCS := $(sort $(wildcard *.asm *.inc ../lib/*.asm) sin.inc meshes.inc sparks.inc)
+SRCS := $(sort $(wildcard *.asm *.inc ../lib/*.asm) sin.inc meshes.inc sparks.inc \
+        ../lib/vfont.inc)
 
 # Register contracts (CLAUDE.md) are checked before every assembly; a
 # problem stops the build. "make check" runs the check alone.

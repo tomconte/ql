@@ -8,8 +8,9 @@
 ;     mode 4's pixels, which are 1.5x taller than wide. A character cell
 ;     is vf_adv units across (the letter's 4 and a gap of 2), so n
 ;     characters span (n*vf_adv - 2)*d2 px, and 6*d3 rows plus one unit
-;     for Q's tail. No clipping: the text must lie on screen. ~0.4 ms a
-;     stroke at k = 1 (draw_line's measured costs): for static screens.
+;     for Q's tail. No clipping: the text must lie on screen. ~0.6 ms a
+;     stroke at k = 1..2 (measured in vfont/): for static screens.
+;     draw_textc centres a string on x 256.
 ;   draw_bcd: packed BCD numbers in the HUD digits, the digits' strokes
 ;     rasterized offline at 6 px by vf_dh rows, one byte per row,
 ;     written into the green plane like lib/draw_dec.asm (self-erasing,
@@ -79,6 +80,28 @@ draw_text:
         bra.s   .ch
 .done:  movem.l (sp)+,d6-d7/a2-a3/a5
         rts
+
+; draw_textc: draw_text centred on x 256 -- n characters start at
+; 256 - (n*vf_adv - 2)*d2/2.
+; In:      a0 = the string, d1.w = y, d2.w = px per grid unit across,
+;          d3.w = rows per grid unit down, d4.w = colour, a4 = screen
+;          base
+; Out:     none
+; Trashes: d0-d5, a0, a1, dtx_ws
+draw_textc:
+        move.l  a0,a1
+.len:   tst.b   (a1)+
+        bne.s   .len
+        move.l  a1,d0
+        sub.l   a0,d0
+        subq.w  #1,d0               ; n
+        mulu.w  #vf_adv,d0
+        subq.w  #2,d0
+        mulu.w  d2,d0
+        lsr.w   #1,d0
+        neg.w   d0
+        add.w   #256,d0             ; x
+        bra     draw_text           ; tail call
 
 ; draw_bcd: a packed BCD number in the HUD digits (vf_dig), one digit
 ; per 8-px screen group, green plane only; leading zeros blank (the

@@ -34,7 +34,9 @@ listing `make` now writes, relocated to the job's load address.
 running; each call stalls the emulation for a moment, so time against
 the wall clock only with peeks 5 s or more apart. Keyboard input is not simulated: what you can check is what the
 program does unattended (glider: set `test_keys` in `equates.inc` to hold
-keys down, e.g. Right to sweep every object across the screen). Internals, and how to re-derive them after an
+keys down, e.g. Right to sweep every object across the screen;
+`test_auto` gets past the title screen and the pause on its own,
+`test_shield` shortens each craft's life). Internals, and how to re-derive them after an
 emulator update: `docs/qemulator.md` "Looking inside a running
 emulator".
 
