@@ -1,12 +1,15 @@
-# Game engine spec -- ground-skimmer raid (working title)
+# Game engine spec -- STARQLIDER, a ground-skimmer raid (working title)
 
-Draft v0.2, 2026-09-24. v0.1 (2026-09-06) came out of the
+Draft v0.3, 2026-10-10. v0.1 (2026-09-06) came out of the
 control-scheme brainstorm; v0.2 folds in the design pass of
 2026-09-23/24: the carrier is dropped (for now), and Atari's
 Battlezone (1980) joins Starglider as an inspiration -- ideas taken
 one by one (four-corner sight, radar strip, wraparound field,
 windshield crack), not a clone (no lock-on, no tanks, no lone enemy,
-no single shell). Everything marked **decided** came out of those
+no single shell). v0.3 plans Beta 1, the subset of M4 that makes the
+M3 build a game for testers (section 11.1), and names it STARQLIDER
+(Starglider + QL; the working title). Everything marked **decided**
+came out of those
 discussions; open points are collected in section 12. The engine
 builds on `shapes/` (reference 3D engine) and the `lib/` routines;
 nothing here contradicts `docs/takeover.md`, `docs/vector-perf.md` or
@@ -26,7 +29,9 @@ the CLAUDE.md rules.
   gliders. Destroy every generator and the craft warps to the next
   sector (the next map), harder than the last. Energy packs flown
   into refill the shield; three craft per game. The carrier, the
-  stranded personnel and pickup-by-stopping are gone.
+  stranded personnel and pickup-by-stopping are gone. On screen the
+  generators are **crystals** (**decided** 2026-10-10: it is what the
+  player sees); the code and this spec keep "generator".
 - **Aesthetic**: Starglider 1 / arcade Star Wars wireframe with
   backface culling, no filled polygons, mode 4 colours with fixed
   meaning (section 5.5). Stark and dark (**decided**): black sky,
@@ -401,18 +406,31 @@ Elements:
   dot list, a blip recorded only where `bset` turned its pixel on.
   Measured ~1.5 ms a frame (sweep ~0.9, 3-4 blips ~0.6); a dotted
   sweep would halve its share. Out-of-range generators pinned to the
-  rim at their bearing: still open (section 12).
+  rim at their bearing (**decided** for Beta 1, 2026-10-10: the test
+  sector's three sit 2450..3650 units from the spawn, all beyond the
+  range, and the last one is hard to find in a wrapping field): per
+  live one out of range, its bearing to a 6-bit angle, and the blip on
+  that angle's rim pixel, the last record of its sweep list -- a few
+  tenths of a ms each, only while out of range.
 - **Shield bar**, top left: 8 segments, green, red at 2 or less, the
-  spare craft as small icons under it. Built in M3 (`shield_bar`):
+  spare craft as small icons under it (Beta 1: vector chevrons). Built
+  in M3 (`shield_bar`):
   8-px slots 16 px apart from x 16, rows 8..13, a full slot solid, an
   empty one its floor row; drawn straight into both screens when the
-  shield changes. **Score** (6 digits,
-  `draw_dec`) and **generators left** (a crystal icon and the count),
+  shield changes. **Score** (6 digits; Beta 1: packed BCD, since
+  `draw_dec` takes a word, in the vector-looking bitmap digits of
+  section 5.7) and **crystals left** (a crystal icon and the count),
   top right. All redrawn only when they change, into both buffers.
-- **No text messages** (**decided**: no ENEMY TO LEFT and the like).
+- **No text messages** in play (**decided**: no ENEMY TO LEFT and the
+  like). Text appears only on the title, the sector cards and game
+  over (section 5.7).
 - **Windshield crack** (**decided**): when the shield reaches zero
   the view freezes, and eight precomputed crack groups (white) appear
   one per frame over the play area, then hold before the next craft.
+  Beta 1: the freeze is the loop not flipping; the groups (from a
+  generator script, inside the play area, mirrored for a second
+  pattern) are drawn onto the shown screen a few beats apart and hold
+  about 2 s.
 
 ### 5.5 Colour semantics
 
@@ -581,6 +599,36 @@ whole object per frame (~13 ms, section 9).
   destroyed; game over after the third. Score for gliders, mines and
   generators, plus a sector bonus.
 
+  As decided for Beta 1 (2026-10-10, section 11.1):
+  - **Warp**: the last crystal's burst plays out (about a second, the
+    craft unhurt), then the controls lock, the objects go (their erase
+    boxes clear them within two frames; collisions off, the craft
+    would fly through towers) and only the lattice streams past,
+    faster and faster, before black, the next sector's card and its
+    map. The lattice repeats every `latd` (256), so a frame that moves
+    the camera more than 128 units along a lattice axis shows the
+    field standing still or running backwards (the wagon-wheel
+    effect), and cruise is already 24 units a beat: 96 a 4-beat frame,
+    120 at 5 beats. With only the lattice on screen the frame falls to
+    about a beat, and the speed ramps to ~120 units a frame, five
+    times cruise at 50 Hz. The warp moves per frame, not per beat
+    (cosmetic, nothing plays), so it stays under the limit whatever
+    the frame takes.
+  - **Sectors**: `tools/genlevel.py` (the scratchpad script that made
+    the test sector, promoted) makes three, with 3, 4 and 5 crystals;
+    each table starts with a header (the spawn point, today's
+    `spawn_*` equates, and the launch delay). After the third, the
+    third repeats with a shorter delay. `ngl` stays 4: it is the
+    budget knob, not a difficulty knob.
+  - **The shield is refilled at the warp** (no energy packs in the
+    beta, so it would otherwise only go down).
+  - **The next craft** clears the gliders, shots and sparks and
+    restarts the generators' launch timers (staggered as at the sector
+    start), so a craft never respawns into three attackers.
+  - **Score**: mine 50, dart 100, wedge 200, kite 300, crystal 1000,
+    and 1000 x the sector number for clearing it; mines rammed score
+    nothing (they cost 2 shield). No extra craft.
+
 ## 7. Combat and collisions
 
 Everything lives on one plane, so every test is 2D, and every test
@@ -665,7 +713,8 @@ generator -- requested where they happen with the `sfx` macro, whose
 number is the priority (explosion > damage > hit > enemy fire > fire;
 no pickup or warp yet); the highest of the frame is sent after the
 keyboard read. The parameter blocks are first guesses, not yet heard;
-no engine tone.
+no engine tone. Beta 1 adds the crack and the warp (a rising sweep:
+the BEEP gradient), and an ear pass on all of them before release.
 
 ## 9. Budgets
 
@@ -868,10 +917,68 @@ initialise with `lea label(pc)` at runtime. No self-modifying code
    beats now), tuning the AI and the sounds by play and by ear.
 4. **M4 sectors**: level tables (`tools/genlevel.py`), energy packs,
    the warp, three craft and the windshield crack, score, title and
-   end screens.
+   end screens. Most of it comes first as Beta 1 (section 11.1).
 5. **M5 polish**: difficulty ramp, the bottom band's fate, `.mdv`
    release, checks on MiSTer / Next / real hardware, and on a faster
    machine (`Speed=Full`; a Gold Card if one is at hand).
+
+### 11.1 Beta 1
+
+**Decided** 2026-10-10: a public beta before the rest of M4, so that
+more people can try the game -- the subset that makes the M3 build a
+game a tester can start, play and understand, with no frills. In
+scope:
+
+- **Game flow**: title -> sector card -> play; at zero shield the
+  windshield crack, then the next craft or, after the third, game
+  over -> title; the last crystal destroyed -> warp -> the next
+  sector's card. Today `main` sets up once and falls into the frame
+  loop for good; the startup splits into once only (the projection
+  tables; the radar's sweep lists -- `radar_tabs` reads screen 0, so
+  before the title goes up), per game (score, craft), per sector (the
+  level into the entity pool, the generator list, the spawn) and per
+  craft (gliders, shots, sparks cleared; both screens cleared and the
+  strip redrawn; the per-buffer erase and dot lists and the sight's
+  state emptied; a pending frame bit dropped). Every transition
+  re-enters the frame loop through that reset.
+- **Text** (section 5.7): vector strokes on the title, the cards and
+  game over; vector-looking bitmap digits in play.
+- **Title screen**: STARQLIDER, BETA 1, the goal (DESTROY ALL WHITE
+  CRYSTALS), the controls (ARROWS STEER, SPACE FIRES), PRESS SPACE,
+  the session's high score and the last score (no QDOS after the
+  takeover, so nothing is saved). Space counts only after a release:
+  it is also fire, and may be held from the last game.
+- **Score** and **crystals left** in the strip (section 5.4), points
+  as in section 6, added where shots destroy things (`shots_step`,
+  which the gliders' hits go through too), from a small table per
+  mesh (the directory's 32 bytes are full).
+- **Out-of-range crystals on the radar rim** (section 5.4).
+- **Three craft and the windshield crack** (sections 5.4, 6): the
+  hook is `shield_check`, whose restart at zero shield was the
+  stand-in.
+- **The warp, three sectors, the shield refilled at the warp**
+  (section 6).
+- **A beta build**: a `dev` flag; off = no meters, readouts or
+  headroom bar (bitmap digits, and 1.2..2.6 ms a frame), no Enter
+  reset (a free full shield), no test hooks. The version on the title
+  screen, `boot` reduced to the EXEC, a tester note (controls, goal,
+  known issues: the MiSTer flicker, gliders through obstacles, reset
+  the machine to quit; the feedback wanted).
+- If cheap: Esc pause (a freeze, nothing drawn); an ear pass on the
+  six sounds plus the crack and warp ones.
+
+Left for M4/M5: energy packs, extra craft, difficulty beyond the
+launch delay, the 3-beat budget, the bottom band.
+
+Order, one commit each on the `beta` branch, each checked unattended
+(`make shot` with peeks of the state, score, craft and sector; test
+flags to start in a state, empty the shield or clear the crystals):
+the font and text routines, in a rig, judged on its preview and a
+qlshot first (the riskiest part to the eye); the game flow (states,
+the init split, title, game over, the `dev` flag); score, crystal
+count and rim blips; craft and crack; warp, sectors, refill;
+packaging (`.mdv`, `.qlpak`, the tester note, a tag), played on
+Q-emuLator and the NanoQL core.
 
 ## 12. Decisions and open questions
 
@@ -894,20 +1001,28 @@ no text messages; dot-spark explosions; the stark black look with no
 horizon line or skyline; a 3-beat design budget with the game the
 same at any frame rate; no self-modifying code.
 
+**Decided** (v0.3, 2026-10-10): Beta 1 as scoped in section 11.1; the
+working title STARQLIDER; "crystals" on screen; text in vector
+strokes, the in-game readouts in vector-looking bitmap digits
+(section 5.7); out-of-range generators pinned to the radar rim; the
+score values (section 6), no extra craft in the beta; three sectors
+from `tools/genlevel.py`, the shield refilled at the warp; the warp's
+sequence (section 6).
+
 **Open**:
 
-- Setting and title (moon base, ship hull, terraformed planet).
+- Setting (moon base, ship hull, terraformed planet); the title past
+  the working one.
 - `horizon` row, `D`, `cam_h`, `z_far`: M1 picked 80 / 256 / 128 /
   2048 (2026-09-10) after 120 / 512 / 40 / 4096 read as a flat
   strip; `z_far` 1536 since 2026-10-10 (to be judged in play); still
   tunable in `glider/equates.inc`.
 - Drift constants; turn rate coupled to speed or not.
 - Radar scale: 2304 units since M3 (2026-09-29, by the budget,
-  section 5.4); out-of-range generators pinned to the rim at their
-  bearing, or not.
-- Score values, extra craft (at score thresholds or not), the
-  difficulty curve per sector.
-- The warp effect's details; what the bottom band becomes (M5).
+  section 5.4).
+- After the beta: score values by play, extra craft (at score
+  thresholds or not), the difficulty curve per sector.
+- What the bottom band becomes (M5).
 - The frame budget with gliders (section 9): 4..5 beats against the
   3-beat design budget -- accept 4, or which levers (fewer objects in
   view, `zfar`, the glider cap, far LOD, projection tables).
