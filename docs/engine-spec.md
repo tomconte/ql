@@ -334,6 +334,12 @@ Algorithm:
   M1 projects with two divides per dot instead of the tables above: a
   `zc>>4` table quantizes depth in 16-unit buckets, which is a
   20-row band at the near edge, and the dots would hop between rails.
+- `z_far` = 1536 since 2026-10-10 (a budget lever, section 9): the
+  two densest rows go (56 dots at the spawn view become 30) and the
+  field ends 15 rows under the horizon instead of 11; objects are
+  still drawn out to the world box, so the far ones stand beyond the
+  last dots. The projection tables keep their own range, `ztab` =
+  2048, for the shots, which fly 2000 and borrow them.
 
 Reverse motion needs nothing special: the dots flow toward the
 horizon, which is the reverse indicator.
@@ -781,6 +787,11 @@ it adds). Not yet tried: the M2 levers (far LOD, a reciprocal table
 for the projection divides), thinking every 4 beats, a cheaper
 object-stage overhead per mesh. Decision pending (section 12).
 
+Applied 2026-10-10, after play (the user found it "still surprisingly
+nice" at 4..5 beats): `z_far` 1536 (section 5.3). Measured the same
+way: spawn 75.6 -> 72.1 (1792) -> 67.9 ms (1536); flying with
+autofire 75.3 -> 70.6 -> 66.8 ms, 4.2 -> 3.8 beats.
+
 Memory: code + tables well under 64 KB; meshes a few KB; two dot lists
 of 128 x 4 bytes; entity pool 64 x 16 bytes; level tables a few KB.
 Meters stay in the build (`no_erase`/`no_draw` style flags) until the
@@ -888,7 +899,8 @@ same at any frame rate; no self-modifying code.
 - Setting and title (moon base, ship hull, terraformed planet).
 - `horizon` row, `D`, `cam_h`, `z_far`: M1 picked 80 / 256 / 128 /
   2048 (2026-09-10) after 120 / 512 / 40 / 4096 read as a flat
-  strip; still tunable in `glider/equates.inc`.
+  strip; `z_far` 1536 since 2026-10-10 (to be judged in play); still
+  tunable in `glider/equates.inc`.
 - Drift constants; turn rate coupled to speed or not.
 - Radar scale: 2304 units since M3 (2026-09-29, by the budget,
   section 5.4); out-of-range generators pinned to the rim at their

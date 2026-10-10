@@ -479,9 +479,10 @@ shot_gl:
 ; shots_draw: every live shot as a segment from its head to its tail in
 ; its colour (the player's green, the enemy's red), gun_dy below the eye
 ; (the gliders' gl_y), with an erase box. Drawn only when both
-; ends lie between the lattice's near and far planes inside the
-; 90-degree view, so no clipping: a shot shows from its second beat or
-; so, and burns out before zfar. The ends project through the lattice's
+; ends lie between the lattice's near plane and ztab (the projection
+; tables' range) inside the 90-degree view, so no clipping: a shot shows
+; from its second beat or so, and burns out before ztab. The ends
+; project through the lattice's
 ; reciprocal table (no divides): sx = 256 + (xc*invtab) >> 12, sy =
 ; horizon + (invtab*shot_ym) >> 16. Needs this frame's ocam (the object
 ; stage sets it).
@@ -539,7 +540,7 @@ shots_draw:
 ; screen through the lattice's reciprocal table, for shots_draw.
 ; In:      d0.w = x, d1.w = z (world units), ocam = this frame's camera
 ; Out:     carry clear: d0.w = sx, d1.w = sy; carry set: the point lies
-;          outside znear..zfar-1 or the 90-degree view (d0, d1 changed);
+;          outside znear..ztab-1 or the 90-degree view (d0, d1 changed);
 ;          ccr
 ; Trashes: d2, d3, a0
 shot_proj:
@@ -561,7 +562,7 @@ shot_proj:
         asr.l   #8,d1               ; zc
         cmp.w   #znear,d1
         blt.s   .off
-        cmp.w   #zfar,d1
+        cmp.w   #ztab,d1
         bge.s   .off
         move.w  d2,d0
         bpl.s   .xp

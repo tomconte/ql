@@ -111,7 +111,7 @@ main:
         divu.w  d2,d0
         move.w  d0,(a1,d1.w)
         addq.w  #1,d2
-        cmp.w   #zfar,d2
+        cmp.w   #ztab,d2
         blt.s   .tab
 
         lea     level(pc),a0        ; static entities into the pool
@@ -360,9 +360,9 @@ sv_stack_top:
 ; end of this file) addresses it: the projection tables live there,
 ; built at startup, and the file stays small. DATASPACE in the Makefile
 ; (passed in as ds_avail) must cover ds_size.
-rowoff      equ     0               ; word[zfar]: row*128+1 per depth
-invtab      equ     zfar*2          ; word[zfar]: xfocal*4096/depth
-radtab      equ     zfar*4          ; rad_nang sweep lists (radar_tabs)
+rowoff      equ     0               ; word[ztab]: row*128+1 per depth
+invtab      equ     ztab*2          ; word[ztab]: xfocal*4096/depth
+radtab      equ     ztab*4          ; rad_nang sweep lists (radar_tabs)
 ds_size     equ     radtab+rad_nang*rad_stride
         if      ds_size>ds_avail
         fail    "DATASPACE in the Makefile is smaller than ds_size"

@@ -54,7 +54,15 @@ yfocal      equ     170             ; sy = horizon + y*yfocal/z; keep
 playtop     equ     28              ; first play-area row (top strip above)
 playbot     equ     239             ; last play-area row (HUD from 240)
 znear       equ     cam_h*yfocal/(playbot-horizon)+1 ; nearest depth drawn
-zfar        equ     2048            ; farthest: 10 rows under the horizon
+zfar        equ     1536            ; farthest dot: 15 rows under the horizon
+                                    ; (2048 until 2026-10-10: 11 rows, ~8 ms
+                                    ; a loop more, measured)
+ztab        equ     2048            ; the projection tables' depth range
+                                    ; (rowoff, invtab): the lattice's out
+                                    ; to zfar, the shots' (range 2000)
+        if      zfar>ztab
+        fail    "the lattice reaches past the projection tables (ztab)"
+        endc
 latd        equ     256             ; lattice spacing, MUST be 2^n
 nwin        equ     zfar/latd+1     ; half-window in cells (+1: the
                                     ; in-cell offset eats up to a cell)
@@ -132,7 +140,7 @@ nboom       equ     6               ; (the puffs of hits take them too)
 
 ; ----- player shots (spec 7): up to nshots in flight, one every fire_cd
 ; beats while Space is held, shot_v units a beat for shot_life beats
-; (range 2000, inside zfar), launched alternately from the gun ports
+; (range 2000, inside ztab), launched alternately from the gun ports
 ; gun_dx either side of the eye and gun_dy below it, drawn as shot_len-
 ; unit green segments. First values (2026-09-29), to be tuned by feel.
 nshots      equ     4
