@@ -490,6 +490,33 @@ whole object per frame (~13 ms, section 9).
   burst 16 sparks; their red sparks read close to the red lattice dots
   from afar.
 
+### 5.7 Text and digits
+
+**Decided** 2026-10-10 (Beta 1): everything written on the screen
+looks drawn by vectors. One font, `tools/genfont.py` (the glyphs as
+Python data, validated; `--png` draws a preview sheet), generates
+`lib/vfont.inc`, which `lib/draw_text.asm` draws in two forms:
+
+- **Strokes** (`draw_text`) for the title, the sector cards and game
+  over: every character a few polylines on a 4 x 6 grid, Atari vector
+  style (the digits 7-segment-like; O and 0 one rectangle, S and 5 one
+  shape), drawn with `draw_line` at any size, in any colour. A grid
+  unit is 3k px across by 2k rows down (mode 4 pixels are 1.5x taller
+  than wide: the projection's 256:170), so a letter is 12k px by 12k
+  rows in a cell of 18k px, and Q's tail reaches a unit below: k = 1
+  for text, 2 for the title. No clipping: text is placed on screen by
+  construction. Measured in the `vfont/` rig (2026-10-10, frames
+  counted between characters): a mock title screen and the whole set,
+  445 strokes, in 13 frames -- ~0.6 ms a stroke at these sizes; the
+  title line (42 strokes at k = 2) ~40 ms. Fine for static screens,
+  too slow for readouts that change in play (a 6-digit score ~15 ms).
+- **HUD digits** (`draw_bcd`) for the readouts in play: the digits'
+  strokes rasterized by genfont at 6 px by 7 rows, one byte a row,
+  written into the green plane one digit per 8-px group (packed BCD
+  in, leading zeros blank, self-erasing): the same look for the cost
+  of `draw_dec`'s byte writes. Bitmaps that look like vectors where
+  real vectors would cost more (the user's call, 2026-10-10).
+
 ## 6. World and entities
 
 - **Sector** (**decided** 2026-09-24): a 32 x 32-cell square (8192

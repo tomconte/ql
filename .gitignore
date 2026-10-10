@@ -4,6 +4,7 @@
 *.mdv
 *.lst
 qlshot.png
+preview.png
 stage/
 
 # stray local files, not part of the project
