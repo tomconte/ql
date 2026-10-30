@@ -93,9 +93,11 @@ gl_phase:
         dc.w    1
 gl_next:
         dc.w    0                   ; the type the next launch takes
-; the generators (their entities), listed at startup: count, pointers
+; the generators (their entities), listed at startup: count, pointers;
+; their fire timers (beats, in the same order: gens_fire)
 gens:   dc.w    0
         ds.l    ngen
+gen_ft: ds.w    ngen
 ; near: the entities inside the world box (the object stage, each
 ; frame), for the shots' hit tests; close: those within r_close, for
 ; the craft's; each a count, then pointers

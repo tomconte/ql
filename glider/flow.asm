@@ -185,7 +185,8 @@ sector_load:
 ; craft_start: a craft's start (spec 6): the screens cleared (play_clear),
 ; the gliders, shots and explosions gone, the live generators' launch
 ; timers back to the level table's (so the craft is not met by the
-; gliders that got the last one), the craft at the spawn with a full
+; gliders that got the last one) and their fire timers to gen_fwait,
+; the craft at the spawn with a full
 ; shield (so a warp refills it too: spec 6, Beta 1) and its bar, the
 ; strip's readouts, no event or warp pending, the next simulation one
 ; beat. Destroyed entities stay destroyed. Screen 0 is shown: the loop
@@ -193,7 +194,7 @@ sector_load:
 ; In:      none
 ; Out:     the screens and lists (play_clear), glpool's gliders free,
 ;          gl_phase, gl_next, shots, eshots, nlive, nelive, fire_t,
-;          booms, nbooms, the generators' e_tmr, craft, shield,
+;          booms, nbooms, the generators' e_tmr, gen_ft, craft, shield,
 ;          shield_chg, hurt_t, sight_col, event, warp_t, sfx_want,
 ;          headroom+16
 ; Trashes: d0-d5, a0-a3, a4, a5
@@ -239,7 +240,11 @@ craft_start:
 .gn:    lea     e_size(a0),a0
         lea     e_size(a1),a1
         bra.s   .gen
-.gend:  lea     event(pc),a0
+.gend:  lea     gen_ft(pc),a0       ; and their guns (gens_fire)
+        moveq   #ngen-1,d0
+.ft:    move.w  #gen_fwait,(a0)+
+        dbf     d0,.ft
+        lea     event(pc),a0
         clr.w   (a0)
         lea     warp_t(pc),a0
         clr.w   (a0)

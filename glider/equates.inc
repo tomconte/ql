@@ -185,6 +185,15 @@ patrol_r    equ     600             ; the patrol wheels round inside this
 ngen        equ     8
 gen_own     equ     2
 gen_spin    equ     64              ; 0.25 brad a beat: a turn in 20 s
+; ... and they shoot back (spec 7, gens_fire): a live one within
+; gen_frange of the craft fires an enemy shot at it every gen_fcd beats,
+; the first gen_fwait beats (counted in range) after a craft starts; the
+; head leaves gen_nose from the centre, clear of the crystal's collision
+; circle (96) by more than the shot's drawn length (eshot_len)
+gen_frange  equ     1500
+gen_fcd     equ     75
+gen_fwait   equ     50
+gen_nose    equ     160
 ; enemy shots (spec 7): up to neshots in flight, eshot_v units a beat for
 ; eshot_life beats (range 1800), launched eshot_nose ahead of the hull
 ; centre; slow enough to see and slide out of

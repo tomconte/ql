@@ -467,14 +467,36 @@ glider_launch:
 
 ; --------------------------------------------------------------- eshot fire
 ; eshot_fire: an enemy shot from the glider's nose (eshot_nose ahead of
-; its centre) along its heading, eshot_v units a beat for eshot_life
-; beats, red; the static entity it will stop at is cast at launch
-; (shot_cast), as for the player's shots.
+; its centre) along its heading (eshot_go).
 ; In:      a0 = the glider
 ; Out:     carry clear: a shot fired (eshots, nelive, sfx_want); carry
 ;          set: all neshots in flight; ccr
 ; Trashes: d0-d3, a1, a3
 eshot_fire:
+        movem.l d4-d5,-(sp)
+        move.w  g_s(a0),d1          ; s
+        move.w  g_c(a0),d2          ; c
+        move.w  d1,d4
+        muls.w  #eshot_nose,d4
+        asr.l   #8,d4
+        add.w   g_x(a0),d4          ; the head starts at the nose
+        move.w  d2,d5
+        muls.w  #eshot_nose,d5
+        asr.l   #8,d5
+        add.w   g_z(a0),d5
+        bsr.s   eshot_go
+        movem.l (sp)+,d4-d5         ; (movem leaves the carry alone)
+        rts
+
+; ----------------------------------------------------------------- eshot go
+; eshot_go: an enemy shot, its head at (x, z), along the direction (s, c),
+; eshot_v units a beat for eshot_life beats, red; the static entity it
+; will stop at is cast at launch (shot_cast), as for the player's shots.
+; In:      d1.w = s, d2.w = c (8.8), d4.w = x, d5.w = z (the head)
+; Out:     carry clear: a shot fired (eshots, nelive, sfx_want); carry
+;          set: all neshots in flight; ccr
+; Trashes: d0-d3, a1, a3
+eshot_go:
         lea     eshots(pc),a1
         lea     neshots*sh_size(a1),a3
 .free:  tst.w   sh_life(a1)
@@ -484,34 +506,24 @@ eshot_fire:
         blo.s   .free
         ori     #1,ccr
         rts
-.got:   move.w  g_s(a0),d1          ; s
-        move.w  g_c(a0),d2          ; c
-        move.w  d1,sh_s(a1)
+.got:   move.w  d1,sh_s(a1)
         move.w  d2,sh_c(a1)
         move.w  d1,d3
         muls.w  #eshot_v,d3
         asr.l   #8,d3
-        move.w  d3,sh_vx(a1)        ; velocity: eshot_v along the heading
+        move.w  d3,sh_vx(a1)        ; velocity: eshot_v along (s, c)
         move.w  d2,d3
         muls.w  #eshot_v,d3
         asr.l   #8,d3
         move.w  d3,sh_vz(a1)
-        move.w  d1,d3
-        muls.w  #-eshot_len,d3
-        asr.l   #8,d3
-        move.w  d3,sh_tx(a1)        ; head to tail: eshot_len back
-        move.w  d2,d3
-        muls.w  #-eshot_len,d3
-        asr.l   #8,d3
-        move.w  d3,sh_tz(a1)
-        muls.w  #eshot_nose,d1
+        muls.w  #-eshot_len,d1
         asr.l   #8,d1
-        add.w   g_x(a0),d1
-        move.w  d1,sh_x(a1)         ; the head starts at the nose
-        muls.w  #eshot_nose,d2
+        move.w  d1,sh_tx(a1)        ; head to tail: eshot_len back
+        muls.w  #-eshot_len,d2
         asr.l   #8,d2
-        add.w   g_z(a0),d2
-        move.w  d2,sh_z(a1)
+        move.w  d2,sh_tz(a1)
+        move.w  d4,sh_x(a1)
+        move.w  d5,sh_z(a1)
         move.w  #eshot_life,sh_life(a1)
         move.w  #eshot_v,sh_v(a1)
         lea     nelive(pc),a3
@@ -663,6 +675,94 @@ gen_step:
         blo.s   .gend
         clr.w   (a0)
 .gend:  dbf     d5,.gen
+        rts
+
+; ---------------------------------------------------------------- gens fire
+; gens_fire: the crystals shoot back (spec 7), once a frame by the beats
+; of this loop's simulation: each live generator within gen_frange of
+; the craft counts its fire timer (gen_ft, parallel to gens) down and,
+; when it has run out, fires an enemy shot at the craft as it is now (no
+; lead), its head gen_nose out from the centre (clear of the crystal's
+; own collision circle, which shot_cast would stop it on), then waits
+; gen_fcd beats; with all neshots in flight it tries again next frame.
+; Out of range the timer holds. The distance d is max(|dx|,|dz|) or
+; 7/8 max + min/2, whichever is larger (-3..+1 %), the direction
+; (dx, dz)*256/d, so the shot's speed and the frame of its hit test are
+; off by those few percent.
+; In:      none
+; Out:     gen_ft; shots fired (eshots, nelive, sfx_want)
+; Trashes: d0-d6, a0-a3, a5, a6
+gens_fire:
+        move.l  craft+c_px(pc),d0
+        lsr.l   #8,d0
+        movea.w d0,a0               ; a0 = the craft's x, a5 its z
+        move.l  craft+c_pz(pc),d0
+        lsr.l   #8,d0
+        movea.w d0,a5
+        lea     gens(pc),a6
+        move.w  (a6)+,d6
+        lea     gen_ft(pc),a2
+        bra     .gend
+.gen:   move.l  (a6)+,a3
+        tst.w   e_flags(a3)
+        beq     .next               ; destroyed
+        move.w  a0,d0
+        sub.w   e_x(a3),d0
+        lsl.w   #16-sector_sh,d0
+        asr.w   #16-sector_sh,d0    ; dx = craft - crystal (nearest image)
+        move.w  d0,d2
+        bpl.s   .ax
+        neg.w   d2                  ; |dx|
+.ax:    cmp.w   #gen_frange,d2
+        bhs.s   .next               ; out of range (quick rejects by axis)
+        move.w  a5,d1
+        sub.w   e_z(a3),d1
+        lsl.w   #16-sector_sh,d1
+        asr.w   #16-sector_sh,d1    ; dz
+        move.w  d1,d3
+        bpl.s   .az
+        neg.w   d3                  ; |dz|
+.az:    cmp.w   #gen_frange,d3
+        bhs.s   .next
+        cmp.w   d3,d2
+        bhs.s   .mm
+        exg     d2,d3               ; d2 = max, d3 = min
+.mm:    tst.w   d2
+        beq.s   .next               ; (on its centre: cannot happen)
+        lsr.w   #1,d3
+        add.w   d2,d3
+        move.w  d2,d4
+        lsr.w   #3,d4
+        sub.w   d4,d3               ; 7/8 max + min/2
+        cmp.w   d2,d3
+        bhs.s   .d
+        move.w  d2,d3               ; d
+.d:     cmp.w   #gen_frange,d3
+        bhs.s   .next               ; out of range
+        move.w  headroom+16(pc),d4  ; the beats simulated this loop
+        sub.w   d4,(a2)
+        bgt.s   .next               ; not yet
+        ext.l   d0
+        asl.l   #8,d0
+        divs.w  d3,d0               ; s = dx*256/d
+        ext.l   d1
+        asl.l   #8,d1
+        divs.w  d3,d1               ; c = dz*256/d
+        move.w  d0,d4
+        muls.w  #gen_nose,d4
+        asr.l   #8,d4
+        add.w   e_x(a3),d4          ; the head: gen_nose out towards the craft
+        move.w  d1,d5
+        muls.w  #gen_nose,d5
+        asr.l   #8,d5
+        add.w   e_z(a3),d5
+        move.w  d1,d2               ; c
+        move.w  d0,d1               ; s
+        bsr     eshot_go
+        bcs.s   .next               ; none free: again next frame
+        move.w  #gen_fcd,(a2)
+.next:  addq.l  #2,a2
+.gend:  dbf     d6,.gen
         rts
 
 ; ---------------------------------------------------------------- gen alert

@@ -1,6 +1,6 @@
-# Game engine spec -- STARQLIDER, a ground-skimmer raid (working title)
+# Game engine spec -- STARQLIDER, a ground-skimmer raid
 
-Draft v0.3, 2026-10-10. v0.1 (2026-09-06) came out of the
+Draft v0.4, 2026-10-30. v0.1 (2026-09-06) came out of the
 control-scheme brainstorm; v0.2 folds in the design pass of
 2026-09-23/24: the carrier is dropped (for now), and Atari's
 Battlezone (1980) joins Starglider as an inspiration -- ideas taken
@@ -8,7 +8,8 @@ one by one (four-corner sight, radar strip, wraparound field,
 windshield crack), not a clone (no lock-on, no tanks, no lone enemy,
 no single shell). v0.3 plans Beta 1, the subset of M4 that makes the
 M3 build a game for testers (section 11.1), and names it STARQLIDER
-(Starglider + QL; the working title). Everything marked **decided**
+(Starglider + QL); v0.4 plans release 1.0 (section 11.2), keeps the
+name and starts the difficulty work. Everything marked **decided**
 came out of those
 discussions; open points are collected in section 12. The engine
 builds on `shapes/` (reference 3D engine) and the `lib/` routines;
@@ -717,6 +718,25 @@ runs once per beat (section 2.1).
   is cast at launch (`shot_cast`, now dividing by the shot's own
   speed), the craft tested every beat (the head's sweep against
   `craft_r`). Each hit costs 1 shield.
+- **Crystals that shoot back** (**decided** 2026-10-30, after Beta 1:
+  the sectors played too easy; `gens_fire`): a live crystal within
+  `gen_frange` 1500 of the craft -- inside `alert_r`, so its gliders
+  are on the player too -- fires an enemy shot at the craft every
+  `gen_fcd` 75 beats, the first `gen_fwait` 50 beats after a craft
+  starts, counted only in range (out of range the timer holds). Aimed
+  at where the craft is, no lead: sliding across the line of fire
+  dodges it, flying straight in to shoot the crystal does not, and
+  towers and blocks are cover. The direction is the offset over an
+  estimated length (max, or 7/8 max + min/2 when larger: -3..+1 %;
+  the radar's bearing table, in 64ths of a turn, would miss by up to
+  ~74 units at 1500, more than `craft_r`); the head starts `gen_nose`
+  160 out, clear of the crystal's collision circle (96), or
+  `shot_cast` would stop it on the crystal. Same pool, speed and
+  damage as the gliders' shots (`eshot_go`, shared with
+  `eshot_fire`). It steps once a frame by the loop's beats, like the
+  launches, so a shot leaves on a frame boundary. Cost: ~0.12 ms a
+  frame per live crystal out of range (measured with the objects off:
+  sector 1's three, 0.35 ms), plus ~1 ms per bolt on screen.
 - **Glider-craft contact** (M3, `glider_bump`): the two swap the
   normal component of their relative velocity (equal masses), both
   are halved and both moves undone; a bump at `bump_v` or more costs
@@ -1079,7 +1099,34 @@ the feedback wanted) as `README.txt`, and zips them
 Q-emuLator (the `.mdv` through the ROM's Microdrive driver: ~20 s).
 Left to the user before it goes out: playing it on Q-emuLator and the
 NanoQL core, the ear pass on the sounds, the tag and where it is
-published.
+published. Released 2026-10-14 (tag `beta1`): to testers on a private
+Discord, and as a GitHub pre-release carrying the zip.
+
+### 11.2 Release 1.0
+
+**Decided** 2026-10-30: the first public release, on GitHub and on an
+itch.io page for the Retro Programmers United for Obsolete Systems
+game jam. The title stays STARQLIDER; the licence is MIT (the repo's
+`LICENSE`, shipped in the zip as `LICENSE.txt`). Checked by the user:
+a round at Gold Card speed on Q-emuLator plays fine (section 2.1); the
+sounds are fine for now, better ones are for later.
+
+Difficulty, in this order: (1) the crystals shoot back (section 7,
+built 2026-10-30); (2) a per-sector record -- more words in each
+sector's `sec_dir` entry, written by `tools/genlevel.py` and copied by
+`sector_load` into variables that replace today's constants: the
+crystals' fire interval and range (0 = silent), the hits a crystal
+takes, the enemy shot speed, the glider types a sector's crystals
+launch, the AI's aggression, how much shield the warp refills; (3) a
+ladder of sectors on it, each adding one thing, then a loop through
+them all with the values stepped up (replacing "the third again with
+a shorter delay"). The glider cap `ngl` and `gen_own` stay: they are
+the frame budget's knobs.
+
+Still open for the release: the version on the title screen and in
+`make release` (today `BETA 1`, `-beta1.zip`) with a README for
+players, the itch.io page, the frame-rate decision (section 9), a boot
+on a real QL or a hardware core.
 
 ## 12. Decisions and open questions
 
@@ -1111,10 +1158,13 @@ score values (section 6), no extra craft in the beta; three sectors
 from `tools/genlevel.py`, the shield refilled at the warp; the warp's
 sequence (section 6).
 
+**Decided** (v0.4, 2026-10-30): release 1.0 as planned in section
+11.2; the name STARQLIDER kept; MIT; the crystals shoot back (section
+7); the difficulty work in the order record, then a ladder of sectors.
+
 **Open**:
 
-- Setting (moon base, ship hull, terraformed planet); the title past
-  the working one.
+- Setting (moon base, ship hull, terraformed planet).
 - `horizon` row, `D`, `cam_h`, `z_far`: M1 picked 80 / 256 / 128 /
   2048 (2026-09-10) after 120 / 512 / 40 / 4096 read as a flat
   strip; `z_far` 1536 since 2026-10-10 (to be judged in play); still

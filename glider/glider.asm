@@ -199,6 +199,7 @@ frame_loop:
         bsr     hud_check           ; the score and the crystals left
         ifeq    no_gls
         bsr     gen_step            ; the generators turn and launch
+        bsr     gens_fire           ; and shoot back
         endc
         bsr     warp_check          ; the last one gone: the warp
 
