@@ -156,3 +156,8 @@ CLAUDE.md         conventions and hard-won rules (written for Claude Code,
 - [chibiakumas QL tutorials](https://www.chibiakumas.com/68000/sinclairql.php)
 - [vasm docs](http://sun.hasenbraten.de/vasm/release/vasm.html) (site is HTTP-only)
 - [The QL Forum](https://theqlforum.com/) · [QL Wiki](https://qlwiki.theqlforum.com/)
+
+## License
+
+MIT — see [LICENSE](LICENSE). It covers everything in this repository,
+STARQLIDER included.
