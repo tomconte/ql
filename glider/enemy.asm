@@ -45,7 +45,8 @@ gliders_step:
 ; ------------------------------------------------------------- glider think
 ; glider_think: the AI's decision for the next gt_think beats. A glider
 ; launched by a generator patrols round it until the player comes
-; within alert_r or the generator is hit (gen_alert), then attacks until
+; within the sector's sec_alert or the generator is hit (gen_alert),
+; then attacks until
 ; the player is beyond lose_r with its generator still up. On patrol,
 ; at full thrust, it heads back to the generator from beyond patrol_r
 ; and inside it holds the generator abeam on its right: cloverleaf
@@ -73,7 +74,7 @@ glider_think:
         bsr     gl_frame            ; d0 = rgt, d2 = fwd, d3 = range
         tst.w   g_alert(a0)
         bne.s   .lose
-        cmp.w   #alert_r,d3
+        cmp.w   sec_alert(pc),d3
         bhs     .patrol             ; the player is far: patrol
         move.w  #1,g_alert(a0)      ; close: attack
         bra.s   .att
@@ -490,8 +491,9 @@ eshot_fire:
 
 ; ----------------------------------------------------------------- eshot go
 ; eshot_go: an enemy shot, its head at (x, z), along the direction (s, c),
-; eshot_v units a beat for eshot_life beats, red; the static entity it
-; will stop at is cast at launch (shot_cast), as for the player's shots.
+; at the sector's speed (sec_esv units a beat) for its life (sec_esl
+; beats), red; the static entity it will stop at is cast at launch
+; (shot_cast), as for the player's shots.
 ; In:      d1.w = s, d2.w = c (8.8), d4.w = x, d5.w = z (the head)
 ; Out:     carry clear: a shot fired (eshots, nelive, sfx_want); carry
 ;          set: all neshots in flight; ccr
@@ -509,11 +511,11 @@ eshot_go:
 .got:   move.w  d1,sh_s(a1)
         move.w  d2,sh_c(a1)
         move.w  d1,d3
-        muls.w  #eshot_v,d3
+        muls.w  sec_esv(pc),d3
         asr.l   #8,d3
-        move.w  d3,sh_vx(a1)        ; velocity: eshot_v along (s, c)
+        move.w  d3,sh_vx(a1)        ; velocity: sec_esv along (s, c)
         move.w  d2,d3
-        muls.w  #eshot_v,d3
+        muls.w  sec_esv(pc),d3
         asr.l   #8,d3
         move.w  d3,sh_vz(a1)
         muls.w  #-eshot_len,d1
@@ -524,8 +526,8 @@ eshot_go:
         move.w  d2,sh_tz(a1)
         move.w  d4,sh_x(a1)
         move.w  d5,sh_z(a1)
-        move.w  #eshot_life,sh_life(a1)
-        move.w  #eshot_v,sh_v(a1)
+        move.w  sec_esl(pc),sh_life(a1)
+        move.w  sec_esv(pc),sh_v(a1)
         lea     nelive(pc),a3
         addq.w  #1,(a3)
         sfx     sfx_efire
@@ -564,10 +566,12 @@ eshots_step:
         sub.w   sh_x(a1),d0
         lsl.w   #16-sector_sh,d0
         asr.w   #16-sector_sh,d0    ; wx = craft - head (nearest image)
+        move.w  sh_v(a1),d3
+        add.w   #craft_r,d3         ; the box's half-side
         move.w  d0,d2
         bpl.s   .x
         neg.w   d2
-.x:     cmp.w   #eshot_v+craft_r,d2
+.x:     cmp.w   d3,d2
         bge.s   .miss
         move.l  craft+c_pz(pc),d1
         lsr.l   #8,d1
@@ -577,7 +581,7 @@ eshots_step:
         move.w  d1,d2
         bpl.s   .z
         neg.w   d2
-.z:     cmp.w   #eshot_v+craft_r,d2
+.z:     cmp.w   d3,d2
         bge.s   .miss
         move.w  d0,d2
         muls.w  sh_c(a1),d2         ; wx*c
@@ -595,7 +599,8 @@ eshots_step:
         asr.l   #8,d0               ; along: the craft ahead of the head
         cmp.w   #craft_r,d0
         bge.s   .miss               ; not reached yet
-        cmp.w   #-eshot_v-craft_r,d0
+        add.w   sh_v(a1),d0
+        cmp.w   #-craft_r,d0
         ble.s   .miss               ; passed it before this beat
         clr.w   sh_life(a1)         ; a hit: the shot stops,
         moveq   #-1,d2              ; the craft loses 1
@@ -623,10 +628,10 @@ eshots_step:
 ; gen_step: the generators, once a frame by the beats of this loop's
 ; simulation (spec 6): each live one turns gen_spin a beat, and when its
 ; launch timer (e_tmr) has run out launches a glider from its centre
-; along its heading -- if fewer than gen_own of its own fly and a slot
-; is free (the ngl cap) -- the types in turn (gl_next), then waits
-; gen_dly beats (the sector's); one that cannot launch tries again next
-; frame.
+; along its heading -- if fewer than sec_own of its own fly and a slot
+; is free (the ngl cap) -- the sector's mix of types in turn (gl_next
+; into sec_mix), then waits gen_dly beats (the sector's); one that
+; cannot launch tries again next frame.
 ; In:      none
 ; Out:     the generators' e_head, e_tmr; gliders launched (glpool,
 ;          their entities, gl_next, gl_phase)
@@ -657,12 +662,14 @@ gen_step:
 .on:    lea     g_size(a0),a0
         cmpa.l  a1,a0
         blo.s   .own
-        cmp.w   #gen_own,d1
+        cmp.w   sec_own(pc),d1
         bhs.s   .gend               ; enough of its own up
-        move.w  gl_next(pc),d0      ; the type
-        mulu.w  #gt_size,d0
+        move.w  gl_next(pc),d0      ; the type: the mix's next
+        lea     sec_mix(pc),a2
+        moveq   #0,d1
+        move.b  (a2,d0.w),d1        ; (its record's offset)
         lea     gltypes(pc),a2
-        adda.w  d0,a2
+        adda.w  d1,a2
         move.w  e_x(a3),d0
         move.w  e_z(a3),d1
         move.w  e_head(a3),d2
@@ -671,7 +678,7 @@ gen_step:
         move.w  gen_dly(pc),e_tmr(a3)
         lea     gl_next(pc),a0
         addq.w  #1,(a0)
-        cmp.w   #(gltypes_e-gltypes)/gt_size,(a0)
+        cmp.w   #mix_n,(a0)
         blo.s   .gend
         clr.w   (a0)
 .gend:  dbf     d5,.gen
@@ -679,13 +686,15 @@ gen_step:
 
 ; ---------------------------------------------------------------- gens fire
 ; gens_fire: the crystals shoot back (spec 7), once a frame by the beats
-; of this loop's simulation: each live generator within gen_frange of
+; of this loop's simulation: each live generator within sec_frng of
 ; the craft counts its fire timer (gen_ft, parallel to gens) down and,
 ; when it has run out, fires an enemy shot at the craft as it is now (no
 ; lead), its head gen_nose out from the centre (clear of the crystal's
 ; own collision circle, which shot_cast would stop it on), then waits
-; gen_fcd beats; with all neshots in flight it tries again next frame.
-; Out of range the timer holds. The distance d is max(|dx|,|dz|) or
+; sec_fcd beats; with all neshots in flight it tries again next frame.
+; Out of range the timer holds; with sec_frng 0 (a sector whose
+; crystals hold their fire) nothing happens. The distance d is
+; max(|dx|,|dz|) or
 ; 7/8 max + min/2, whichever is larger (-3..+1 %), the direction
 ; (dx, dz)*256/d, so the shot's speed and the frame of its hit test are
 ; off by those few percent.
@@ -693,6 +702,8 @@ gen_step:
 ; Out:     gen_ft; shots fired (eshots, nelive, sfx_want)
 ; Trashes: d0-d6, a0-a3, a5, a6
 gens_fire:
+        move.w  sec_frng(pc),d0     ; (tst has no pc mode on the 68008)
+        beq     .done               ; they hold their fire here
         move.l  craft+c_px(pc),d0
         lsr.l   #8,d0
         movea.w d0,a0               ; a0 = the craft's x, a5 its z
@@ -713,7 +724,7 @@ gens_fire:
         move.w  d0,d2
         bpl.s   .ax
         neg.w   d2                  ; |dx|
-.ax:    cmp.w   #gen_frange,d2
+.ax:    cmp.w   sec_frng(pc),d2
         bhs.s   .next               ; out of range (quick rejects by axis)
         move.w  a5,d1
         sub.w   e_z(a3),d1
@@ -722,7 +733,7 @@ gens_fire:
         move.w  d1,d3
         bpl.s   .az
         neg.w   d3                  ; |dz|
-.az:    cmp.w   #gen_frange,d3
+.az:    cmp.w   sec_frng(pc),d3
         bhs.s   .next
         cmp.w   d3,d2
         bhs.s   .mm
@@ -737,7 +748,7 @@ gens_fire:
         cmp.w   d2,d3
         bhs.s   .d
         move.w  d2,d3               ; d
-.d:     cmp.w   #gen_frange,d3
+.d:     cmp.w   sec_frng(pc),d3
         bhs.s   .next               ; out of range
         move.w  headroom+16(pc),d4  ; the beats simulated this loop
         sub.w   d4,(a2)
@@ -760,10 +771,10 @@ gens_fire:
         move.w  d0,d1               ; s
         bsr     eshot_go
         bcs.s   .next               ; none free: again next frame
-        move.w  #gen_fcd,(a2)
+        move.w  sec_fcd(pc),(a2)
 .next:  addq.l  #2,a2
 .gend:  dbf     d6,.gen
-        rts
+.done:  rts
 
 ; ---------------------------------------------------------------- gen alert
 ; gen_alert: the gliders launched by the generator a5 attack (spec 6:

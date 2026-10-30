@@ -195,11 +195,18 @@ shield_add:
 ; Out:     shield, hurt_t, sight_col, the shield bar
 ; Trashes: d0-d4, a0, a1
 shield_reset:
+        moveq   #shield_max,d0
+; shield_set: the shield at d0.w (0..shield_max), no hurt, the sight
+; green, the bar drawn.
+; In:      d0.w = the shield
+; Out:     shield, hurt_t, sight_col, the shield bar
+; Trashes: d0-d4, a0, a1
+shield_set:
         lea     shield(pc),a0
         ifne    test_shield
         move.w  #test_shield,(a0)   ; unattended runs: a short-lived craft
         else
-        move.w  #shield_max,(a0)
+        move.w  d0,(a0)
         endc
         lea     hurt_t(pc),a0
         clr.w   (a0)

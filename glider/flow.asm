@@ -6,13 +6,16 @@
 
 ; ------------------------------------------------------------------ game new
 ; game_new: a new game: score 0, ncraft craft, sector 1 (the first
-; table, its own launch delay), no bonus to show.
+; table, its own launch delay), no bonus to show, the shield full (so
+; the first craft starts full whatever sector 1's sd_gain).
 ; In:      none
-; Out:     score, craft_n, sector_n, sect_i, dly_cut, bonus
+; Out:     score, craft_n, sector_n, sect_i, dly_cut, bonus, shield
 ; Trashes: a0
 game_new:
         lea     score(pc),a0
         clr.l   (a0)
+        lea     shield(pc),a0
+        move.w  #shield_max,(a0)
         lea     craft_n(pc),a0
         move.w  #ncraft,(a0)
         lea     sector_n(pc),a0
@@ -91,21 +94,23 @@ warp_check:
 ; --------------------------------------------------------------- sector load
 ; sector_load: the sector's record in sec_dir (levels.inc): its table,
 ; its spawn point (or spawn_x/z/head when test_spawn), its launch delay
-; less dly_cut (at least dly_min); its static entities from the table
-; into the pool (so everything destroyed in the last game is back), the
-; gliders' entities after them (free, each paired with its glider
-; record), and the generators listed for gen_step (spec 6).
+; less dly_cut (at least dly_min), its rules (sd_own on, into sec_*);
+; its static entities from the table into the pool (so everything
+; destroyed in the last game is back), each crystal sec_ghp hits from
+; destroyed (e_hp), the gliders' entities after them (free, each paired
+; with its glider record), and the generators listed for gen_step
+; (spec 6).
 ; In:      none
-; Out:     lvl_ptr, spn_px, spn_pz, spn_h, gen_dly, entpool, glpool's
-;          g_ent, gens
-; Trashes: d0, d1, a0-a2
+; Out:     lvl_ptr, spn_px, spn_pz, spn_h, gen_dly, sec_rules, entpool,
+;          glpool's g_ent, gens
+; Trashes: d0-d2, a0-a2
 sector_load:
         lea     sec_dir(pc),a0
         move.w  sect_i(pc),d0
         mulu.w  #sd_size,d0
         adda.w  d0,a0               ; the sector's record
         lea     levels(pc),a1
-        adda.w  (a0)+,a1            ; its table
+        adda.w  sd_tab(a0),a1       ; its table
         lea     lvl_ptr(pc),a2
         move.l  a1,(a2)
         lea     spn_px(pc),a2       ; the spawn (spn_px, spn_pz, spn_h)
@@ -113,27 +118,31 @@ sector_load:
         move.l  #(spawn_x&(sector-1))<<8,(a2)+
         move.l  #(spawn_z&(sector-1))<<8,(a2)+
         move.w  #spawn_head,(a2)
-        addq.l  #6,a0
         else
         moveq   #0,d0
-        move.w  (a0)+,d0            ; x
+        move.w  sd_x(a0),d0
         and.w   #sector-1,d0
         lsl.l   #8,d0
         move.l  d0,(a2)+
         moveq   #0,d0
-        move.w  (a0)+,d0            ; z
+        move.w  sd_z(a0),d0
         and.w   #sector-1,d0
         lsl.l   #8,d0
         move.l  d0,(a2)+
-        move.w  (a0)+,(a2)          ; heading
+        move.w  sd_head(a0),(a2)
         endc
-        move.w  (a0),d0             ; the launch delay
+        move.w  sd_dly(a0),d0       ; the launch delay
         sub.w   dly_cut(pc),d0
         cmp.w   #dly_min,d0
         bge.s   .dly
         move.w  #dly_min,d0
-.dly:   lea     gen_dly(pc),a0
-        move.w  d0,(a0)
+.dly:   lea     gen_dly(pc),a2
+        move.w  d0,(a2)
+        lea     sd_own(a0),a0       ; the rules
+        lea     sec_rules(pc),a2
+        moveq   #(sd_size-sd_own)/2-1,d0
+.rul:   move.w  (a0)+,(a2)+
+        dbf     d0,.rul
         move.l  a1,a0               ; static entities into the pool
         lea     entpool(pc),a1
 .lvl:   move.w  (a0),d0
@@ -153,6 +162,9 @@ sector_load:
         lea     g_size(a0),a0
         dbf     d0,.gle
         move.w  #-1,e_mesh(a1)      ; the pool's end
+        lea     objdir+msh_gen*32(pc),a0    ; (32-byte entries)
+        move.w  od_hp(a0),d2
+        sub.w   sec_ghp(pc),d2      ; a crystal's hits taken to start with
         lea     entpool(pc),a0      ; the generators, listed for gen_step
         lea     gens+2(pc),a1
         moveq   #0,d1
@@ -160,6 +172,7 @@ sector_load:
         bmi.s   .gsd
         cmp.w   #msh_gen,d0
         bne.s   .gsn
+        move.w  d2,e_hp(a0)         ; sec_ghp to go
         cmp.w   #ngen,d1
         bhs.s   .gsn                ; (more than ngen: the rest stay idle)
         move.l  a0,(a1)+
@@ -186,17 +199,18 @@ sector_load:
 ; the gliders, shots and explosions gone, the live generators' launch
 ; timers back to the level table's (so the craft is not met by the
 ; gliders that got the last one) and their fire timers to gen_fwait,
-; the craft at the spawn with a full
-; shield (so a warp refills it too: spec 6, Beta 1) and its bar, the
-; strip's readouts, no event or warp pending, the next simulation one
-; beat. Destroyed entities stay destroyed. Screen 0 is shown: the loop
-; starts with d7 = 1.
+; the craft at the spawn, its shield what was left plus sec_gain, at
+; most full (the warp into the sector refills that much: its record's
+; sd_gain; a craft after one lost has none left and sec_gain is then
+; shield_max) and its bar, the strip's readouts, no event or warp
+; pending, the next simulation one beat. Destroyed entities stay
+; destroyed. Screen 0 is shown: the loop starts with d7 = 1.
 ; In:      none
 ; Out:     the screens and lists (play_clear), glpool's gliders free,
 ;          gl_phase, gl_next, shots, eshots, nlive, nelive, fire_t,
 ;          booms, nbooms, the generators' e_tmr, gen_ft, craft, shield,
-;          shield_chg, hurt_t, sight_col, event, warp_t, sfx_want,
-;          headroom+16
+;          sec_gain, shield_chg, hurt_t, sight_col, event, warp_t,
+;          sfx_want, headroom+16
 ; Trashes: d0-d5, a0-a3, a4, a5
 craft_start:
         bsr     play_clear
@@ -255,7 +269,16 @@ craft_start:
         lea     headroom+16(pc),a0  ; the first loop simulates one beat
         move.w  #1,(a0)
         bsr     craft_reset         ; at the spawn,
-        bsr     shield_reset        ; the shield full, its bar drawn,
+        move.w  shield(pc),d0       ; the shield: what is left (none
+        bpl.s   .shl                ;   after a craft lost)
+        moveq   #0,d0
+.shl:   add.w   sec_gain(pc),d0     ; and the sector's gain,
+        cmp.w   #shield_max,d0
+        ble.s   .shm
+        moveq   #shield_max,d0      ;   at most full
+.shm:   lea     sec_gain(pc),a0     ; (the next craft here starts full)
+        move.w  #shield_max,(a0)
+        bsr     shield_set          ; its bar drawn,
         bsr     strip_draw          ; the score, crystals, spare craft
         ifne    test_gl
         bsr     gl_test             ; a dart, a wedge, a kite ahead

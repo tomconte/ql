@@ -175,31 +175,32 @@ firew       equ     40              ; fire when the player is this close
 orbit_b     equ     50              ; the wedge: beats orbiting at its range,
 attack_b    equ     110             ;   then beats turning in to fire
 orbit_m     equ     200             ; the orbit holds inside hold + this
-alert_r     equ     1800            ; a patrolling glider attacks inside this
 lose_r      equ     3500            ; an attacking one gives up beyond this
+                                    ; (it attacks inside the sector's
+                                    ; sec_alert, which genlevel keeps under)
 patrol_r    equ     600             ; the patrol wheels round inside this
-; generators (spec 6): each launches up to gen_own gliders of its own
+; generators (spec 6): each launches up to sec_own gliders of its own
 ; (under the ngl cap), one every gen_dly beats (the sector's launch
-; delay, levels.inc: 500 = 10 s in sector 1), the types in turn; it
-; turns gen_spin a beat. At most ngen per sector.
+; delay, levels.inc: 500 = 10 s in sector 1), the types of the sector's
+; mix in turn (mix_n of them, so cycles of 1, 2, 3 or 6 types); it turns
+; gen_spin a beat. At most ngen per sector. The sector's record sets the
+; numbers that make it harder (sd_* below, vars.inc's sec_*).
 ngen        equ     8
-gen_own     equ     2
+mix_n       equ     6
 gen_spin    equ     64              ; 0.25 brad a beat: a turn in 20 s
-; ... and they shoot back (spec 7, gens_fire): a live one within
-; gen_frange of the craft fires an enemy shot at it every gen_fcd beats,
-; the first gen_fwait beats (counted in range) after a craft starts; the
-; head leaves gen_nose from the centre, clear of the crystal's collision
-; circle (96) by more than the shot's drawn length (eshot_len)
-gen_frange  equ     1500
-gen_fcd     equ     75
+; ... and they shoot back (spec 7, gens_fire): in a sector whose fire
+; range (sec_frng) is not 0, a live one within it of the craft fires an
+; enemy shot at it every sec_fcd beats, the first gen_fwait beats
+; (counted in range) after a craft starts; the head leaves gen_nose from
+; the centre, clear of the crystal's collision circle (96) by more than
+; the shot's drawn length (eshot_len)
 gen_fwait   equ     50
 gen_nose    equ     160
-; enemy shots (spec 7): up to neshots in flight, eshot_v units a beat for
-; eshot_life beats (range 1800), launched eshot_nose ahead of the hull
-; centre; slow enough to see and slide out of
+; enemy shots (spec 7): up to neshots in flight, at the sector's speed
+; (sec_esv units a beat; 40 is slow enough to see and slide out of) for
+; its life (sec_esl beats: genlevel keeps the range at 1800), launched
+; eshot_nose ahead of the hull centre
 neshots     equ     4
-eshot_v     equ     40
-eshot_life  equ     45
 eshot_nose  equ     64
 eshot_len   equ     48              ; drawn length
 
@@ -320,7 +321,8 @@ e_x         equ     4               ; word, world x (integer units)
 e_z         equ     6               ; word, world z
 e_y         equ     8               ; word, centre height over the ground
 e_head      equ     10              ; word, 8.8 brads
-e_hp        equ     12              ; reserved (M3)
+e_hp        equ     12              ; word, hits taken: destroyed at od_hp
+                                    ; (a crystal starts at od_hp - sec_ghp)
 e_tmr       equ     14              ; reserved (M3)
 e_size      equ     16
 
@@ -337,7 +339,7 @@ sh_tz       equ     16
 sh_hit      equ     18              ; word, the life at which it hits sh_tgt
                                     ; (shot_cast), 0 = nothing on its path
 sh_tgt      equ     20              ; long, the entity it will hit
-sh_v        equ     24              ; word, its speed (shot_v, eshot_v)
+sh_v        equ     24              ; word, its speed (shot_v, sec_esv)
 sh_col      equ     26              ; word, draw_line colour
 sh_size     equ     28
 
@@ -384,6 +386,29 @@ gt_bgap     equ     22              ; word, beats between a burst's shots
 gt_think    equ     24              ; word, beats between thinks
 gt_orbit    equ     26              ; word, nonzero: orbit at the hold range
 gt_size     equ     28
+
+; sector record (sec_dir in levels.inc, from tools/genlevel.py: the
+; same order there); sector_load copies sd_own on to vars.inc's sec_*
+sd_tab      equ     0               ; word, its entity table, from levels
+sd_x        equ     2               ; word, the spawn: x, z (world units),
+sd_z        equ     4
+sd_head     equ     6               ;   heading (8.8 brads)
+sd_dly      equ     8               ; word, the launch delay (beats; less
+                                    ; dly_cut past the last sector)
+sd_own      equ     10              ; word, gliders a crystal keeps up
+sd_alert    equ     12              ; word, a patrolling glider attacks
+                                    ; inside this
+sd_mix      equ     14              ; mix_n bytes, the types launched in
+                                    ; turn (record offsets in gltypes)
+sd_ghp      equ     20              ; word, hits to destroy a crystal
+sd_frng     equ     22              ; word, a crystal fires inside this
+                                    ; (0 = never)
+sd_fcd      equ     24              ; word, beats between a crystal's shots
+sd_esv      equ     26              ; word, the enemy shots' speed (units a
+sd_esl      equ     28              ;   beat), their life (beats)
+sd_gain     equ     30              ; word, shield the warp into the
+                                    ; sector restores (shield_max: full)
+sd_size     equ     32
 
 ; explosion record (booms)
 bm_live     equ     0               ; word, beats left, 0 = free

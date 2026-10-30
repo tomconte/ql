@@ -141,6 +141,31 @@ spn_pz: dc.l    0
 spn_h:  dc.w    0
 dly_cut:
         dc.w    0
+; ... and its rules, copied from its record by sector_load (sd_own on,
+; in the record's order, equates.inc): the gliders a crystal keeps up,
+; the alert range, the types launched in turn (offsets in gltypes), a
+; crystal's hits, its fire range (0 = it holds its fire) and interval,
+; the enemy shots' speed and life, the shield the next craft's start
+; adds (the warp's refill; then shield_max: a new craft starts full)
+sec_rules:                          ; (each sized by the record's offsets,
+sec_own:                            ;   so the copy cannot get out of step)
+        ds.b    sd_alert-sd_own
+sec_alert:
+        ds.b    sd_mix-sd_alert
+sec_mix:
+        ds.b    sd_ghp-sd_mix
+sec_ghp:
+        ds.b    sd_frng-sd_ghp
+sec_frng:
+        ds.b    sd_fcd-sd_frng
+sec_fcd:
+        ds.b    sd_esv-sd_fcd
+sec_esv:
+        ds.b    sd_esl-sd_esv
+sec_esl:
+        ds.b    sd_gain-sd_esl
+sec_gain:
+        ds.b    sd_size-sd_gain
 bonus:  dc.l    0
 warp_t: dc.w    0
 warp_v: dc.w    0

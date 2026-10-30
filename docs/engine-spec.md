@@ -649,12 +649,14 @@ Python data, validated; `--png` draws a preview sheet), generates
     the frame takes.
   - **Sectors**: `tools/genlevel.py` (the scratchpad script that made
     the test sector, promoted) makes three, with 3, 4 and 5 crystals;
-    each table starts with a header (the spawn point, today's
-    `spawn_*` equates, and the launch delay). After the third, the
-    third repeats with a shorter delay. `ngl` stays 4: it is the
-    budget knob, not a difficulty knob.
+    each has a record in `sec_dir` (the spawn point and the launch
+    delay; since 2026-10-30 its rules too, section 11.2). After the
+    third, the third repeats with a shorter delay. `ngl` stays 4: it
+    is the budget knob, not a difficulty knob.
   - **The shield is refilled at the warp** (no energy packs in the
-    beta, so it would otherwise only go down).
+    beta, so it would otherwise only go down): by the next sector's
+    `sd_gain`, full (8) in all three today; a craft after one lost
+    always starts full.
   - **The next craft** clears the gliders, shots and sparks and
     restarts the generators' launch timers (staggered as at the sector
     start), so a craft never respawns into three attackers.
@@ -713,16 +715,20 @@ runs once per beat (section 2.1).
 - **Enemy shots**: a pool of 4, red, fired along the glider's heading,
   slow enough to see and slide out of (the drift is the dodge); they
   hit the player inside `craft_r` and are stopped by obstacles. Built
-  in M3: 40 units a beat for 45 beats (range 1800), from 64 ahead of
+  in M3: 40 units a beat for 45 beats (range 1800; since 2026-10-30
+  the sector's speed, `sec_esv`, its life keeping the range), from 64
+  ahead of
   the hull centre, drawn 48 long like the player's; the static world
   is cast at launch (`shot_cast`, now dividing by the shot's own
   speed), the craft tested every beat (the head's sweep against
   `craft_r`). Each hit costs 1 shield.
 - **Crystals that shoot back** (**decided** 2026-10-30, after Beta 1:
   the sectors played too easy; `gens_fire`): a live crystal within
-  `gen_frange` 1500 of the craft -- inside `alert_r`, so its gliders
-  are on the player too -- fires an enemy shot at the craft every
-  `gen_fcd` 75 beats, the first `gen_fwait` 50 beats after a craft
+  the sector's fire range (`sec_frng`: 1500 in sectors 2 and 3 --
+  inside the alert range, so its gliders are on the player too; 0 in
+  sector 1, whose crystals hold their fire) of the craft fires an
+  enemy shot at it every `sec_fcd` beats (75), the first `gen_fwait`
+  50 beats after a craft
   starts, counted only in range (out of range the timer holds). Aimed
   at where the craft is, no lead: sliding across the line of fire
   dodges it, flying straight in to shoot the crystal does not, and
@@ -1112,16 +1118,37 @@ a round at Gold Card speed on Q-emuLator plays fine (section 2.1); the
 sounds are fine for now, better ones are for later.
 
 Difficulty, in this order: (1) the crystals shoot back (section 7,
-built 2026-10-30); (2) a per-sector record -- more words in each
-sector's `sec_dir` entry, written by `tools/genlevel.py` and copied by
-`sector_load` into variables that replace today's constants: the
-crystals' fire interval and range (0 = silent), the hits a crystal
-takes, the enemy shot speed, the glider types a sector's crystals
-launch, the AI's aggression, how much shield the warp refills; (3) a
-ladder of sectors on it, each adding one thing, then a loop through
-them all with the values stepped up (replacing "the third again with
-a shorter delay"). The glider cap `ngl` and `gen_own` stay: they are
-the frame budget's knobs.
+built 2026-10-30); (2) a per-sector record (built 2026-10-30, below);
+(3) a ladder of sectors on it, each adding one thing, then a loop
+through them all with the values stepped up (replacing "the third
+again with a shorter delay"). The glider cap `ngl` stays: it is the
+frame budget's knob.
+
+**The sector record** (`sec_dir` in `levels.inc`, 32 bytes, the `sd_*`
+layout in `equates.inc`; written by `tools/genlevel.py` from its `RULES`
+defaults and each sector's overrides, which it range-checks):
+the table, the spawn point and the launch delay as before, then the
+rules `sector_load` copies into `sec_*` (`vars.inc`, each variable
+sized from the record's offsets) in place of the old constants:
+
+| field | was | what it sets |
+| --- | --- | --- |
+| `sd_own` | `gen_own` 2 | gliders a crystal keeps up (under `ngl`) |
+| `sd_alert` | `alert_r` 1800 | range inside which a patrolling glider attacks (under `lose_r`) |
+| `sd_mix` | the types in turn | 6 bytes: the types launched in turn (cycles of 1, 2, 3 or 6) |
+| `sd_ghp` | `od_hp` 5 | hits to destroy a crystal (its `e_hp` starts at 5 - this) |
+| `sd_frng` | `gen_frange` 1500 | range inside which a crystal fires; 0 = it never does |
+| `sd_fcd` | `gen_fcd` 75 | beats between a crystal's shots |
+| `sd_esv`, `sd_esl` | `eshot_v` 40, `eshot_life` 45 | enemy shots' speed (units a beat) and life (genlevel: range 1800) |
+| `sd_gain` | full | shield the warp into the sector restores |
+
+Today's values are the old constants in all three sectors, except that
+sector 1's crystals hold their fire: firing crystals arrive in sector
+2, the first rung of the ladder. Checked unattended (2026-10-30) with
+throwaway values: each field reaches play (kites only, one per
+crystal, 2-hit crystals, faster bolts that still hit, the refill
+summing up to full), and the real build soaks clean. Cost: a few
+memory operands in place of immediates.
 
 Still open for the release: the version on the title screen and in
 `make release` (today `BETA 1`, `-beta1.zip`) with a README for
@@ -1160,7 +1187,8 @@ sequence (section 6).
 
 **Decided** (v0.4, 2026-10-30): release 1.0 as planned in section
 11.2; the name STARQLIDER kept; MIT; the crystals shoot back (section
-7); the difficulty work in the order record, then a ladder of sectors.
+7); the difficulty work in the order record, then a ladder of sectors;
+the record's fields (section 11.2), sector 1's crystals silent.
 
 **Open**:
 
