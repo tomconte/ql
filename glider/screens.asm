@@ -1,7 +1,8 @@
 ; screens.asm -- glider: the screens around play (Beta 1, spec 11.1):
 ; the title, the sector card, game over, the pause; their timing and
 ; text helpers. All in vector text (lib/draw_text.asm, spec 5.7): the
-; big words white, the rest green. Included by glider.asm.
+; big words white, the rest green, the title's event line and its
+; PRESS SPACE red. Included by glider.asm.
 
 ; ---------------------------------------------------------------- scr clear
 ; scr_clear: both screens black ($20000-$2ffff).
@@ -107,9 +108,10 @@ bcd_put:
         rts
 
 ; -------------------------------------------------------------- title screen
-; title_screen: the title on screen 0 (spec 11.1): STARQLIDER, BETA 1,
-; the goal, the keys, PRESS SPACE, the session's best and the last
-; game's scores; until Space is pressed afresh.
+; title_screen: the title on screen 0 (spec 11.1): STARQLIDER, the
+; release's event line (red), the goal, the keys, PRESS SPACE (red),
+; the session's best and the last game's scores; until Space is
+; pressed afresh.
 ; In:      none
 ; Out:     txtbuf
 ; Trashes: d0-d5, a0-a2, a4, dtx_ws
@@ -120,9 +122,9 @@ title_screen:
         lea     tx_title(pc),a0
         moveq   #36,d1
         bsr     big_white
-        lea     tx_beta(pc),a0
+        lea     tx_event(pc),a0
         moveq   #72,d1
-        bsr     med_green
+        bsr     med_red
         lea     tx_goal(pc),a0
         moveq   #104,d1
         bsr     med_green
@@ -131,7 +133,7 @@ title_screen:
         bsr     med_green
         lea     tx_press(pc),a0
         move.w  #160,d1
-        bsr     med_green
+        bsr     med_red
         lea     txtbuf(pc),a0       ; HI 000000   LAST 000000
         lea     tx_hi(pc),a1
         bsr     str_put
@@ -376,4 +378,14 @@ med_green:
         moveq   #tx_med,d2
         moveq   #tx_med*2/3,d3
         moveq   #col_green,d4
+        bra     draw_textc          ; tail call
+
+; med_red: a string centred, in red letters (tx_med).
+; In:      a0 = the string, d1.w = y, a4 = screen base
+; Out:     none
+; Trashes: d0-d5, a0, a1, dtx_ws
+med_red:
+        moveq   #tx_med,d2
+        moveq   #tx_med*2/3,d3
+        moveq   #col_red,d4
         bra     draw_textc          ; tail call

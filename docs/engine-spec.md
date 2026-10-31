@@ -1212,10 +1212,21 @@ minefield) 54.7, 8 50.7; the minefield is the densest view, ~6 ms over
 Beta 1's heaviest. Size: 29996 bytes (the five new tables and the
 loop's records, +3.2 KB).
 
-Still open for the release: the version on the title screen and in
-`make release` (today `BETA 1`, `-beta1.zip`) with a README for
-players, the itch.io page, the frame-rate decision (section 9), a boot
-on a real QL or a hardware core.
+**The release's name** (decided 2026-10-31, the user): 1.0 in the
+package, the player note and the READMEs; the title screen's second
+line is the jam's, HALLOWEEN 26 RPUFOS (`tx_event`), in red, as is
+PRESS SPACE, for some colour beside the white title and the green
+text. `make release` writes `release/starqlider-1.0.zip` (`VERSION` in
+the Makefile): the `.qlpak`, the `.mdv` (medium STARQLIDER), the
+player note `PLAYERS.txt` (was `BETA.txt`; how to run it, the game,
+controls, scoring, known issues, source and licence) as `README.txt`,
+and `LICENSE.txt`. The note and both READMEs say the game was
+developed for the RPUFOS Sinclair QL game jam and link its page,
+<https://itch.io/jam/rpufos-sinclair-ql>. Both packages boot to the
+title in Q-emuLator (the `.mdv` through the ROM's driver).
+
+Still open for the release: the itch.io page, the frame-rate decision
+(section 9), a boot on a real QL or a hardware core.
 
 ## 12. Decisions and open questions
 
@@ -1253,7 +1264,8 @@ sequence (section 6).
 the record's fields (section 11.2), sector 1's crystals silent; the
 ladder of eight with a caption per card, then the harder lap on a loop
 (section 11.2); the crystals outrange the craft (2026-10-31, section
-7).
+7); the release named 1.0, its title line HALLOWEEN 26 RPUFOS in red
+(section 11.2).
 
 **Open**:
 

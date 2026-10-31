@@ -6,8 +6,11 @@ the result in the Q-emuLator emulator with one command.
 
 The programs build on each other: a QDOS "Hello, World!", bare-metal
 takeover demos with sound, double buffering and direct keyboard reads,
-then line drawing, a wireframe 3D engine, and the game it is growing
-into, [`glider/`](glider/README.md).
+then line drawing, a wireframe 3D engine, and the game it grew into:
+STARQLIDER, in [`glider/`](glider/README.md). STARQLIDER 1.0 was
+developed for the Sinclair QL game jam of the Retro Programmers United
+for Obsolete Systems (RPUFOS):
+<https://itch.io/jam/rpufos-sinclair-ql>.
 
 ## Prerequisites
 
@@ -88,8 +91,8 @@ cube/             first 3D milestone: a rotating white wireframe cube,
 shapes/           the reference 3D engine: a parade of five validated
                   meshes with backface culling, box erase, colour lines
                   and live performance meters
-glider/           the game in progress: a first-person wireframe hovercraft
-                  raid over a flat world (see glider/README.md)
+glider/           the game, STARQLIDER 1.0: a first-person wireframe
+                  hovercraft raid over a flat world (see glider/README.md)
 vfont/            the vector font rig: a mock title screen and the whole
                   character set in strokes, plus the HUD digits
 lib/

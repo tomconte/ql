@@ -1,36 +1,33 @@
-# glider — STARQLIDER, a wireframe hovercraft raid (working title)
+# glider — STARQLIDER, a wireframe hovercraft raid
 
-The game this workspace is building toward: a first-person raid over a
-flat, entirely artificial world, flown in a fragile hover-glider with
-tank controls and drift. Starglider 1 is the look, and Battlezone
-supplies a few ideas. It runs in mode 4 with the machine fully taken
-over, double-buffered at the VBL. The design, budgets and milestones
-are in [docs/engine-spec.md](../docs/engine-spec.md).
+STARQLIDER 1.0 (Halloween 2026) was developed for the Sinclair QL game
+jam of the Retro Programmers United for Obsolete Systems (RPUFOS):
+<https://itch.io/jam/rpufos-sinclair-ql>.
 
-**Status:** M1 (flight rig) and M2 (world: entities, culling, clipping,
-per-object erase) are done; M3 (combat) has a first version of
-everything. You fly around a wrapping 8192-unit test sector of towers,
-blocks and mines, with the four-corner sight, a heading-up radar and
-the shield bar in the top strip. Three white generator crystals launch
-enemy gliders (darts, wedges and kites, up to four at once) that patrol
-round them until you come close or shoot their generator, then attack
-and fire red bolts you can slide out of. You can shoot everything
-except towers and blocks; things explode into sparks, bumping into
-things costs shield, and there are sound effects. The frame rate is
-the open question: busy scenes take 4 to 5 beats (12.5 to 10 Hz)
-against a design budget of 3 (see the engine spec, section 9).
+A first-person raid over a flat, entirely artificial world, flown in a
+fragile hover-glider with tank controls and drift. Starglider 1 is the
+look, and Battlezone supplies a few ideas. It runs on a stock QL
+(68008, 128K) in mode 4 with the machine fully taken over,
+double-buffered at the VBL. The design, budgets and milestones are in
+[docs/engine-spec.md](../docs/engine-spec.md).
 
-**Beta 1** (in progress, branch `beta`; plan in the engine spec,
-section 11.1) turns this into a game for testers: a title screen,
-three craft per game, game over and back to the title, a pause, all
-text in vector letters (`lib/draw_text.asm`), the score, the crystals
-left and the spare craft in the strip, the crystals out of radar range
-pinned to its rim, the windshield crack, and the warp to the next
-sector once every crystal is destroyed (three sectors, then the third
-again with faster launches; for 1.0 a ladder of eight, each adding one
-thing that its card names, then a harder lap on a loop: spec section
-11.2, `tools/genlevel.py`). The build is the beta's
-by default: `dev` in `equates.inc` brings back the development band.
+**Status: 1.0.** You fly a wrapping 8192-unit sector of towers, blocks
+and mines, with the four-corner sight, a heading-up radar, the shield
+bar, the score, the crystals left and the spare craft in the top strip.
+White generator crystals launch enemy gliders (darts, wedges and
+kites, up to four at once) that patrol round them until you come close
+or shoot their crystal, then attack and fire red bolts you can slide
+out of; from sector 2 the crystals fire too, from further than your
+guns reach. Destroying every crystal warps you to the next sector: a
+ladder of eight, each adding one thing that its card names, then a
+harder lap on a loop (engine spec section 11.2, `tools/genlevel.py`).
+Three craft per game, a windshield crack when one is lost, a title
+screen, a pause, all text in vector letters (`lib/draw_text.asm`).
+Busy scenes take 4 to 5 beats (12.5 to 10 Hz) against a design budget
+of 3 (engine spec, section 9). The build is the release's by default:
+`dev` in `equates.inc` brings back the development band. The note for
+players, shipped in the release as `README.txt`, is
+[PLAYERS.txt](PLAYERS.txt).
 
 ## Build and run
 
@@ -38,8 +35,8 @@ by default: `dev` in `equates.inc` brings back the development band.
 make          # check the register contracts, assemble, package glider.qlpak
 make run      # launch Q-emuLator (close it before rebuilding)
 make mdv      # glider.mdv, a Microdrive image for real hardware and FPGA cores
-make release  # the beta for testers: release/starqlider-beta1.zip (.qlpak,
-              # .mdv and BETA.txt as README.txt)
+make release  # the 1.0 release: release/starqlider-1.0.zip (.qlpak, .mdv,
+              # PLAYERS.txt as README.txt, LICENSE.txt)
 make runmdv   # boot the .mdv in Q-emuLator
 make check    # the register-contract check alone
 ```
@@ -65,13 +62,14 @@ within 2304 units -- the ones further away sit on the rim, in their
 direction), and at the right the crystals left and the score (mine
 50, dart 100, wedge 200, kite 300, crystal 1000). The sight flashes
 red when you lose shield; when it runs out, the windshield cracks. A
-dart dies to 1 hit, a wedge 2, a kite 3, a crystal 5.
+dart dies to 1 hit, a wedge 2, a kite 3, a crystal 5 to 10 (the
+sector's rule).
 
 In a `dev` build the band at the bottom shows speed and drift (tenths
 of a unit per beat), heading and the number of objects drawn. The
 second group of readouts and the bar along the bottom edge are
 performance meters measuring idle time per frame; `hud.asm` explains
-each field. The beta build leaves the band black but still counts the
+each field. The release build leaves the band black but still counts the
 meters (`make shot PEEK="headroom+12:w headroom+14:w"`).
 
 Unattended test runs (`make shot` cannot press keys): `test_keys`
@@ -80,7 +78,8 @@ Esc in a pause) after that many frames, `test_shield` starts every
 craft with that shield, `test_gl` puts three gliders ahead at the
 start, `test_warp` starts every sector with its crystals destroyed (it
 warps through them), `test_spawn` uses `spawn_x/z/head` instead of the
-sector's spawn.
+sector's spawn, `test_sect` starts a game at that sector (its index
+from 0).
 
 ## Where things are
 

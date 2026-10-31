@@ -48,16 +48,17 @@ mdv: $(NAME).mdv
 $(NAME).mdv: $(NAME)_bin boot ../tools/mkmdv.py
 	python ../tools/mkmdv.py --name $(NAME) --dataspace $(DATASPACE)
 
-# The beta for testers (spec 11.1): the .qlpak and the .mdv (medium
-# STARQLIDER) under the game's name, with BETA.txt as README.txt and
-# the repo's LICENSE as LICENSE.txt, in release/ and zipped. Build with
-# dev and every test_* flag at 0.
+# The release (spec 11.2): the .qlpak and the .mdv (medium STARQLIDER)
+# under the game's name, with PLAYERS.txt as README.txt and the repo's
+# LICENSE as LICENSE.txt, in release/ and zipped as
+# starqlider-$(VERSION).zip. Build with dev and every test_* flag at 0.
 REL := starqlider
-release: $(NAME).qlpak $(NAME)_bin boot BETA.txt ../LICENSE ../tools/mkmdv.py
-	pwsh -NoProfile -Command "New-Item -ItemType Directory -Force release | Out-Null; Copy-Item $(NAME).qlpak release/$(REL).qlpak; Copy-Item BETA.txt release/README.txt; Copy-Item ../LICENSE release/LICENSE.txt"
+VERSION := 1.0
+release: $(NAME).qlpak $(NAME)_bin boot PLAYERS.txt ../LICENSE ../tools/mkmdv.py
+	pwsh -NoProfile -Command "New-Item -ItemType Directory -Force release | Out-Null; Copy-Item $(NAME).qlpak release/$(REL).qlpak; Copy-Item PLAYERS.txt release/README.txt; Copy-Item ../LICENSE release/LICENSE.txt"
 	python ../tools/mkmdv.py --name $(NAME) --dataspace $(DATASPACE) --label STARQLIDER --out release/$(REL).mdv
 	python ../tools/mkmdv.py --verify release/$(REL).mdv
-	pwsh -NoProfile -Command "Compress-Archive -Force -Path release/$(REL).qlpak,release/$(REL).mdv,release/README.txt,release/LICENSE.txt -DestinationPath release/$(REL)-beta1.zip"
+	pwsh -NoProfile -Command "Compress-Archive -Force -Path release/$(REL).qlpak,release/$(REL).mdv,release/README.txt,release/LICENSE.txt -DestinationPath release/$(REL)-$(VERSION).zip"
 
 run: $(NAME).qlpak
 	pwsh -NoProfile -Command "Start-Process -FilePath '$(QEMU)' -ArgumentList '$(NAME).qlpak'"

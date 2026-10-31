@@ -5,8 +5,8 @@
 ; --------------------------------------------------------------------- texts
 tx_title:
         dc.b    'STARQLIDER',0
-tx_beta:
-        dc.b    'BETA 1',0
+tx_event:                           ; the release's line (1.0: the jam's)
+        dc.b    'HALLOWEEN 26 RPUFOS',0
 tx_goal:
         dc.b    'DESTROY ALL WHITE CRYSTALS',0
 tx_keys:
