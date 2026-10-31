@@ -27,7 +27,9 @@ text in vector letters (`lib/draw_text.asm`), the score, the crystals
 left and the spare craft in the strip, the crystals out of radar range
 pinned to its rim, the windshield crack, and the warp to the next
 sector once every crystal is destroyed (three sectors, then the third
-again with faster launches). The build is the beta's
+again with faster launches; for 1.0 a ladder of eight, each adding one
+thing that its card names, then a harder lap on a loop: spec section
+11.2, `tools/genlevel.py`). The build is the beta's
 by default: `dev` in `equates.inc` brings back the development band.
 
 ## Build and run

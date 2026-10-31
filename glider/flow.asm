@@ -6,8 +6,9 @@
 
 ; ------------------------------------------------------------------ game new
 ; game_new: a new game: score 0, ncraft craft, sector 1 (the first
-; table, its own launch delay), no bonus to show, the shield full (so
-; the first craft starts full whatever sector 1's sd_gain).
+; record, its own launch delay; test_sect's when set), no bonus to
+; show, the shield full (so the first craft starts full whatever the
+; sector's sd_gain).
 ; In:      none
 ; Out:     score, craft_n, sector_n, sect_i, dly_cut, bonus, shield
 ; Trashes: a0
@@ -18,10 +19,10 @@ game_new:
         move.w  #shield_max,(a0)
         lea     craft_n(pc),a0
         move.w  #ncraft,(a0)
-        lea     sector_n(pc),a0
-        move.w  #$01,(a0)
+        lea     sector_n(pc),a0     ; (packed BCD)
+        move.w  #(((test_sect+1)/10)<<4)+(test_sect+1)-((test_sect+1)/10)*10,(a0)
         lea     sect_i(pc),a0
-        clr.w   (a0)
+        move.w  #test_sect,(a0)
         lea     dly_cut(pc),a0
         clr.w   (a0)
         lea     bonus(pc),a0
@@ -31,7 +32,8 @@ game_new:
 ; -------------------------------------------------------------- sector next
 ; sector_next: the sector cleared (spec 6, 11.1): its bonus, 1000 times
 ; its number, scored and kept for the next card; the next sector -- past
-; the last table, the last again with the launch delay cut by dly_step.
+; the last record, the loop's lap again (sect_loop on, levels.inc) with
+; the launch delay cut by dly_step.
 ; In:      none
 ; Out:     score, hud_chg, bonus, sector_n, sect_i, dly_cut
 ; Trashes: d0, d1, a0
@@ -52,9 +54,10 @@ sector_next:
         lea     sect_i(pc),a0
         cmp.w   #nsect-1,(a0)
         bhs.s   .last
-        addq.w  #1,(a0)             ; the next table
+        addq.w  #1,(a0)             ; the next record
         rts
-.last:  lea     dly_cut(pc),a0      ; the last again, faster launches
+.last:  move.w  #sect_loop,(a0)     ; the loop's lap again,
+        lea     dly_cut(pc),a0      ;   with faster launches
         add.w   #dly_step,(a0)
         rts
 
@@ -94,7 +97,8 @@ warp_check:
 ; --------------------------------------------------------------- sector load
 ; sector_load: the sector's record in sec_dir (levels.inc): its table,
 ; its spawn point (or spawn_x/z/head when test_spawn), its launch delay
-; less dly_cut (at least dly_min), its rules (sd_own on, into sec_*);
+; less dly_cut (at least dly_min), its rules and caption (sd_own on,
+; into sec_*);
 ; its static entities from the table into the pool (so everything
 ; destroyed in the last game is back), each crystal sec_ghp hits from
 ; destroyed (e_hp), the gliders' entities after them (free, each paired

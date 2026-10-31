@@ -624,8 +624,8 @@ Python data, validated; `--png` draws a preview sheet), generates
   occasional drop where a glider dies.
 - **Objectives and lives** (**decided**): destroy every generator.
   The last one triggers the warp: controls lock, the craft
-  accelerates (the lattice streams past), black, the sector number,
-  the next map. Each sector adds generators and enemy speed and
+  accelerates (the lattice streams past), black, the sector number
+  and a caption naming what the sector adds, the next map. Each sector adds generators and enemy speed and
   removes packs. Three craft per game: at zero shield the windshield
   cracks (section 5.4), then the next craft restarts the sector at
   its spawn with a full shield, destroyed generators staying
@@ -648,15 +648,17 @@ Python data, validated; `--png` draws a preview sheet), generates
     (cosmetic, nothing plays), so it stays under the limit whatever
     the frame takes.
   - **Sectors**: `tools/genlevel.py` (the scratchpad script that made
-    the test sector, promoted) makes three, with 3, 4 and 5 crystals;
-    each has a record in `sec_dir` (the spawn point and the launch
-    delay; since 2026-10-30 its rules too, section 11.2). After the
-    third, the third repeats with a shorter delay. `ngl` stays 4: it
-    is the budget knob, not a difficulty knob.
+    the test sector, promoted) made three for Beta 1, with 3, 4 and 5
+    crystals; each has a record in `sec_dir` (the spawn point and the
+    launch delay; since 2026-10-30 its rules and its card's caption
+    too). Since 2026-10-30 they are a ladder of eight, each adding one
+    thing, then a harder lap over the same tables that repeats with a
+    shorter delay (section 11.2). `ngl` stays 4: it is the budget
+    knob, not a difficulty knob.
   - **The shield is refilled at the warp** (no energy packs in the
     beta, so it would otherwise only go down): by the next sector's
-    `sd_gain`, full (8) in all three today; a craft after one lost
-    always starts full.
+    `sd_gain`, full (8) on the ladder, 5 on the harder lap; a craft
+    after one lost always starts full.
   - **The next craft** clears the gliders, shots and sparks and
     restarts the generators' launch timers (staggered as at the sector
     start), so a craft never respawns into three attackers.
@@ -1120,16 +1122,17 @@ sounds are fine for now, better ones are for later.
 Difficulty, in this order: (1) the crystals shoot back (section 7,
 built 2026-10-30); (2) a per-sector record (built 2026-10-30, below);
 (3) a ladder of sectors on it, each adding one thing, then a loop
-through them all with the values stepped up (replacing "the third
-again with a shorter delay"). The glider cap `ngl` stays: it is the
-frame budget's knob.
+through them all with the values stepped up (built 2026-10-30, below;
+it replaced "the third again with a shorter delay"). The glider cap
+`ngl` stays: it is the frame budget's knob.
 
-**The sector record** (`sec_dir` in `levels.inc`, 32 bytes, the `sd_*`
+**The sector record** (`sec_dir` in `levels.inc`, 34 bytes, the `sd_*`
 layout in `equates.inc`; written by `tools/genlevel.py` from its `RULES`
-defaults and each sector's overrides, which it range-checks):
+defaults and each sector's changes, which it range-checks):
 the table, the spawn point and the launch delay as before, then the
 rules `sector_load` copies into `sec_*` (`vars.inc`, each variable
-sized from the record's offsets) in place of the old constants:
+sized from the record's offsets) in place of the old constants, and
+the card's caption (`sd_cap`, from `levels`):
 
 | field | was | what it sets |
 | --- | --- | --- |
@@ -1142,13 +1145,48 @@ sized from the record's offsets) in place of the old constants:
 | `sd_esv`, `sd_esl` | `eshot_v` 40, `eshot_life` 45 | enemy shots' speed (units a beat) and life (genlevel: range 1800) |
 | `sd_gain` | full | shield the warp into the sector restores |
 
-Today's values are the old constants in all three sectors, except that
-sector 1's crystals hold their fire: firing crystals arrive in sector
-2, the first rung of the ladder. Checked unattended (2026-10-30) with
-throwaway values: each field reaches play (kites only, one per
-crystal, 2-hit crystals, faster bolts that still hit, the refill
-summing up to full), and the real build soaks clean. Cost: a few
-memory operands in place of immediates.
+Checked unattended (2026-10-30) with throwaway values: each field
+reaches play (kites only, one per crystal, 2-hit crystals, faster
+bolts that still hit, the refill summing up to full), and the real
+build soaks clean. Cost: a few memory operands in place of immediates.
+
+**The ladder** (built 2026-10-30): eight sectors, each one thing more
+than the last, which the card names under SECTOR n. In `genlevel.py`
+each sector's `rules` is the change from the sector before, so they
+add up; its table brings the crystals, the mines and the launch
+delay. Sectors 1-3 keep the Beta 1 tables.
+
+| sector | caption | what it adds | crystals | delay |
+| --- | --- | --- | --- | --- |
+| 1 | DESTROY THE 3 CRYSTALS | darts and wedges, silent crystals | 3 | 500 |
+| 2 | THE CRYSTALS FIRE BACK | `frange` 1500 | 4 | 450 |
+| 3 | GUNSHIPS JOIN IN | kites in the mix | 5 | 420 |
+| 4 | MINEFIELD | 22 mines, few towers | 5 | 400 |
+| 5 | CRYSTALS TAKE 8 HITS | `ghp` 8 | 5 | 380 |
+| 6 | THE SWARM | `own` 3, `alert` 2400 | 6 | 320 |
+| 7 | SHARPSHOOTER CRYSTALS | `frange` 1800, `fcd` 45, `esv` 60 | 6 | 320 |
+| 8 | THE FORTRESS: 7 CRYSTALS | a tower cluster, kite-heavy mix | 7 | 300 |
+
+Then sectors 9-16, HARDER STILL: the same tables, with `harder()`
+applied to each rung's rules: one more glider a crystal (at most
+`ngl`), alert +400 (at most 3000), two more hits, every crystal firing
+(sector 1's at 1500, the rest +300 up to 1800), shots half again as
+often (`fcd` x 2/3, at least 30), +10 shot speed (at most 80), 3 less
+shield at the warp (5), the launch delay 100 shorter (at least
+`dly_min`). After sector 16, `sector_next` goes back to the loop's
+first record (`sect_loop`) with the delay cut by `dly_step` each lap.
+`test_sect` (equates.inc) starts a game at any record.
+
+Checked unattended (2026-10-30): the cards with the caption and the
+bonus under it (the longest caption, 24 characters, fits; the card
+takes 26); a game warped through all 16 records (`test_warp`), each
+loading its rules, then sector 17 on record 9 with `dly_cut` 50; soaks
+of sectors 8 and 16 with gliders live (four up, crystals firing, a
+craft lost and the next starting full). Spawn pivot with the gliders
+frozen and hidden, ms a loop: sector 1 45.4, 2 48.7, 4 (the
+minefield) 54.7, 8 50.7; the minefield is the densest view, ~6 ms over
+Beta 1's heaviest. Size: 29996 bytes (the five new tables and the
+loop's records, +3.2 KB).
 
 Still open for the release: the version on the title screen and in
 `make release` (today `BETA 1`, `-beta1.zip`) with a README for
@@ -1188,7 +1226,9 @@ sequence (section 6).
 **Decided** (v0.4, 2026-10-30): release 1.0 as planned in section
 11.2; the name STARQLIDER kept; MIT; the crystals shoot back (section
 7); the difficulty work in the order record, then a ladder of sectors;
-the record's fields (section 11.2), sector 1's crystals silent.
+the record's fields (section 11.2), sector 1's crystals silent; the
+ladder of eight with a caption per card, then the harder lap on a loop
+(section 11.2).
 
 **Open**:
 

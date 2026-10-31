@@ -4,24 +4,96 @@
 ; brads), the launch delay in beats; the gliders a crystal keeps
 ; up, their alert range, the types launched in turn; a crystal's
 ; hits, fire range (0 = none), beats between its shots; the enemy
-; shots' speed and life; the shield the warp into it restores.
-; Then the tables: mesh, flags, x, z, centre height, heading, hits,
-; timer (a crystal's first launch); -1 ends one.
-nsect       equ     3
+; shots' speed and life; the shield the warp into it restores;
+; its card's caption, from levels. The ladder's sectors, then the
+; loop's: the same tables, harder, which sector_next goes back to
+; (sect_loop) after the last. Then the tables: mesh, flags, x, z,
+; centre height, heading, hits, timer (a crystal's first launch);
+; -1 ends one. Then the captions.
+nsect       equ     16
+sect_loop   equ     8
 sec_dir:
         dc.w    lv_1-levels,128,128,0,500         ; sector 1
         dc.w    2,1800
-        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
         dc.w    5,0,75,40,45,8
-        dc.w    lv_2-levels,128,128,0,420         ; sector 2
+        dc.w    cap_1-levels
+        dc.w    lv_2-levels,128,128,0,450         ; sector 2
+        dc.w    2,1800
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
+        dc.w    5,1500,75,40,45,8
+        dc.w    cap_2-levels
+        dc.w    lv_3-levels,128,128,0,420         ; sector 3
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
         dc.w    5,1500,75,40,45,8
-        dc.w    lv_3-levels,128,128,0,350         ; sector 3
+        dc.w    cap_3-levels
+        dc.w    lv_4-levels,128,128,0,400         ; sector 4
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
         dc.w    5,1500,75,40,45,8
-        ifne    sd_size-32
+        dc.w    cap_4-levels
+        dc.w    lv_5-levels,128,128,0,380         ; sector 5
+        dc.w    2,1800
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    8,1500,75,40,45,8
+        dc.w    cap_5-levels
+        dc.w    lv_6-levels,128,128,0,320         ; sector 6
+        dc.w    3,2400
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    8,1500,75,40,45,8
+        dc.w    cap_6-levels
+        dc.w    lv_7-levels,128,128,0,320         ; sector 7
+        dc.w    3,2400
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    8,1800,45,60,30,8
+        dc.w    cap_7-levels
+        dc.w    lv_8-levels,128,128,0,300         ; sector 8
+        dc.w    3,2400
+        dc.b    gt_kite-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_kite-gltypes,gt_wedge-gltypes
+        dc.w    8,1800,45,60,30,8
+        dc.w    cap_8-levels
+        dc.w    lv_1-levels,128,128,0,400         ; sector 9
+        dc.w    3,2200
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
+        dc.w    7,1500,50,50,36,5
+        dc.w    cap_loop-levels
+        dc.w    lv_2-levels,128,128,0,350         ; sector 10
+        dc.w    3,2200
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
+        dc.w    7,1800,50,50,36,5
+        dc.w    cap_loop-levels
+        dc.w    lv_3-levels,128,128,0,320         ; sector 11
+        dc.w    3,2200
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    7,1800,50,50,36,5
+        dc.w    cap_loop-levels
+        dc.w    lv_4-levels,128,128,0,300         ; sector 12
+        dc.w    3,2200
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    7,1800,50,50,36,5
+        dc.w    cap_loop-levels
+        dc.w    lv_5-levels,128,128,0,280         ; sector 13
+        dc.w    3,2200
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    10,1800,50,50,36,5
+        dc.w    cap_loop-levels
+        dc.w    lv_6-levels,128,128,0,220         ; sector 14
+        dc.w    4,2800
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    10,1800,50,50,36,5
+        dc.w    cap_loop-levels
+        dc.w    lv_7-levels,128,128,0,220         ; sector 15
+        dc.w    4,2800
+        dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
+        dc.w    10,1800,30,70,26,5
+        dc.w    cap_loop-levels
+        dc.w    lv_8-levels,128,128,0,200         ; sector 16
+        dc.w    4,2800
+        dc.b    gt_kite-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_kite-gltypes,gt_wedge-gltypes
+        dc.w    10,1800,30,70,26,5
+        dc.w    cap_loop-levels
+        ifne    sd_size-34
         fail    "levels.inc: a record is not sd_size (genlevel.py vs equates.inc)"
         endc
 levels:
@@ -120,3 +192,185 @@ lv_3:                               ; sector 3: seed 41, 5 crystals, 29 entities
         dc.w    msh_tower,1,-209,3558,yb_tower,223<<8,0,0
         dc.w    msh_block,1,1480,3754,yb_block,42<<8,0,0
         dc.w    -1
+lv_4:                               ; sector 4: seed 59, 5 crystals, 35 entities
+        dc.w    msh_gen,1,257,2613,yb_gen,211<<8,0,150
+        dc.w    msh_gen,1,-3944,-3599,yb_gen,147<<8,0,300
+        dc.w    msh_gen,1,-1666,-2408,yb_gen,33<<8,0,450
+        dc.w    msh_gen,1,2258,-1413,yb_gen,203<<8,0,600
+        dc.w    msh_gen,1,-2374,2420,yb_gen,248<<8,0,750
+        dc.w    msh_mine,1,1556,-3342,cam_h,112<<8,0,0
+        dc.w    msh_mine,1,-1234,-3116,cam_h,183<<8,0,0
+        dc.w    msh_mine,1,2077,-3015,cam_h,150<<8,0,0
+        dc.w    msh_mine,1,255,-2837,cam_h,214<<8,0,0
+        dc.w    msh_mine,1,-3397,-2759,cam_h,152<<8,0,0
+        dc.w    msh_mine,1,3421,-2708,cam_h,247<<8,0,0
+        dc.w    msh_mine,1,3582,-2168,cam_h,54<<8,0,0
+        dc.w    msh_mine,1,-2748,-1940,cam_h,170<<8,0,0
+        dc.w    msh_tower,1,-47,-1920,yb_tower,13<<8,0,0
+        dc.w    msh_mine,1,3314,-1685,cam_h,126<<8,0,0
+        dc.w    msh_mine,1,1412,-1655,cam_h,38<<8,0,0
+        dc.w    msh_mine,1,-1275,-1305,cam_h,165<<8,0,0
+        dc.w    msh_mine,1,-3957,-319,cam_h,62<<8,0,0
+        dc.w    msh_tower,1,1431,42,yb_tower,189<<8,0,0
+        dc.w    msh_mine,1,-1655,281,cam_h,245<<8,0,0
+        dc.w    msh_mine,1,-2837,321,cam_h,148<<8,0,0
+        dc.w    msh_tower,1,3577,475,yb_tower,160<<8,0,0
+        dc.w    msh_mine,1,-2987,1326,cam_h,214<<8,0,0
+        dc.w    msh_mine,1,-3527,1391,cam_h,130<<8,0,0
+        dc.w    msh_mine,1,547,1544,cam_h,79<<8,0,0
+        dc.w    msh_block,1,2017,1724,yb_block,7<<8,0,0
+        dc.w    msh_tower,1,3006,1891,yb_tower,202<<8,0,0
+        dc.w    msh_tower,1,-1088,2120,yb_tower,183<<8,0,0
+        dc.w    msh_mine,1,1118,2593,cam_h,187<<8,0,0
+        dc.w    msh_mine,1,-1144,3046,cam_h,33<<8,0,0
+        dc.w    msh_block,1,1799,3158,yb_block,232<<8,0,0
+        dc.w    msh_block,1,-2853,3295,yb_block,60<<8,0,0
+        dc.w    msh_mine,1,-242,3475,cam_h,22<<8,0,0
+        dc.w    msh_mine,1,3496,3499,cam_h,51<<8,0,0
+        dc.w    msh_mine,1,-2612,3850,cam_h,83<<8,0,0
+        dc.w    -1
+lv_5:                               ; sector 5: seed 67, 5 crystals, 29 entities
+        dc.w    msh_gen,1,-162,2645,yb_gen,177<<8,0,150
+        dc.w    msh_gen,1,1703,-840,yb_gen,56<<8,0,300
+        dc.w    msh_gen,1,-2458,-2541,yb_gen,16<<8,0,450
+        dc.w    msh_gen,1,3691,978,yb_gen,121<<8,0,600
+        dc.w    msh_gen,1,2197,4061,yb_gen,25<<8,0,750
+        dc.w    msh_mine,1,-1801,-3567,cam_h,77<<8,0,0
+        dc.w    msh_mine,1,2205,-3249,cam_h,155<<8,0,0
+        dc.w    msh_mine,1,495,-2939,cam_h,138<<8,0,0
+        dc.w    msh_tower,1,-3531,-2909,yb_tower,184<<8,0,0
+        dc.w    msh_mine,1,3499,-2814,cam_h,82<<8,0,0
+        dc.w    msh_tower,1,-1565,-1850,yb_tower,155<<8,0,0
+        dc.w    msh_mine,1,-177,-1823,cam_h,8<<8,0,0
+        dc.w    msh_mine,1,1353,-1638,cam_h,228<<8,0,0
+        dc.w    msh_block,1,-2724,-1587,yb_block,235<<8,0,0
+        dc.w    msh_mine,1,3502,-1298,cam_h,123<<8,0,0
+        dc.w    msh_block,1,-1874,-45,yb_block,71<<8,0,0
+        dc.w    msh_tower,1,3350,34,yb_tower,138<<8,0,0
+        dc.w    msh_mine,1,-2748,65,cam_h,27<<8,0,0
+        dc.w    msh_tower,1,1708,406,yb_tower,157<<8,0,0
+        dc.w    msh_block,1,550,2004,yb_block,126<<8,0,0
+        dc.w    msh_tower,1,1319,2087,yb_tower,198<<8,0,0
+        dc.w    msh_block,1,2977,2101,yb_block,146<<8,0,0
+        dc.w    msh_mine,1,-1600,2110,cam_h,29<<8,0,0
+        dc.w    msh_tower,1,-3039,2144,yb_tower,38<<8,0,0
+        dc.w    msh_mine,1,1631,2978,cam_h,115<<8,0,0
+        dc.w    msh_block,1,-3415,2991,yb_block,63<<8,0,0
+        dc.w    msh_block,1,3472,3075,yb_block,149<<8,0,0
+        dc.w    msh_tower,1,-1949,3540,yb_tower,51<<8,0,0
+        dc.w    msh_tower,1,406,3540,yb_tower,18<<8,0,0
+        dc.w    -1
+lv_6:                               ; sector 6: seed 73, 6 crystals, 30 entities
+        dc.w    msh_gen,1,-172,2539,yb_gen,102<<8,0,150
+        dc.w    msh_gen,1,-2109,-3273,yb_gen,189<<8,0,300
+        dc.w    msh_gen,1,3830,1276,yb_gen,51<<8,0,450
+        dc.w    msh_gen,1,1485,-620,yb_gen,130<<8,0,600
+        dc.w    msh_gen,1,2313,3562,yb_gen,163<<8,0,750
+        dc.w    msh_gen,1,-2683,-795,yb_gen,133<<8,0,900
+        dc.w    msh_tower,1,-1259,-3576,yb_tower,165<<8,0,0
+        dc.w    msh_block,1,1563,-3555,yb_block,101<<8,0,0
+        dc.w    msh_mine,1,3074,-3470,cam_h,122<<8,0,0
+        dc.w    msh_mine,1,-3347,-3147,cam_h,68<<8,0,0
+        dc.w    msh_tower,1,466,-2829,yb_tower,23<<8,0,0
+        dc.w    msh_block,1,2002,-1747,yb_block,116<<8,0,0
+        dc.w    msh_mine,1,-1643,-1580,cam_h,13<<8,0,0
+        dc.w    msh_tower,1,-3091,-1546,yb_tower,133<<8,0,0
+        dc.w    msh_block,1,3371,-1271,yb_block,24<<8,0,0
+        dc.w    msh_tower,1,96,-1242,yb_tower,46<<8,0,0
+        dc.w    msh_mine,1,-1463,68,cam_h,68<<8,0,0
+        dc.w    msh_tower,1,-3071,117,yb_tower,239<<8,0,0
+        dc.w    msh_mine,1,1469,230,cam_h,206<<8,0,0
+        dc.w    msh_block,1,3393,316,yb_block,56<<8,0,0
+        dc.w    msh_block,1,-3133,1498,yb_block,148<<8,0,0
+        dc.w    msh_tower,1,-116,1512,yb_tower,53<<8,0,0
+        dc.w    msh_mine,1,1392,2022,cam_h,8<<8,0,0
+        dc.w    msh_mine,1,3172,2089,cam_h,105<<8,0,0
+        dc.w    msh_mine,1,-1191,2160,cam_h,69<<8,0,0
+        dc.w    msh_mine,1,-1449,3137,cam_h,196<<8,0,0
+        dc.w    msh_mine,1,-3499,3184,cam_h,212<<8,0,0
+        dc.w    msh_tower,1,400,3199,yb_tower,48<<8,0,0
+        dc.w    msh_tower,1,3137,3324,yb_tower,111<<8,0,0
+        dc.w    msh_mine,1,1390,3830,cam_h,79<<8,0,0
+        dc.w    -1
+lv_7:                               ; sector 7: seed 83, 6 crystals, 31 entities
+        dc.w    msh_gen,1,330,2639,yb_gen,59<<8,0,150
+        dc.w    msh_gen,1,-2980,-705,yb_gen,162<<8,0,300
+        dc.w    msh_gen,1,-2917,-3709,yb_gen,81<<8,0,450
+        dc.w    msh_gen,1,2554,-2484,yb_gen,99<<8,0,600
+        dc.w    msh_gen,1,3107,1092,yb_gen,58<<8,0,750
+        dc.w    msh_gen,1,-513,-2102,yb_gen,183<<8,0,900
+        dc.w    msh_tower,1,1606,-3392,yb_tower,83<<8,0,0
+        dc.w    msh_tower,1,-1822,-3328,yb_tower,222<<8,0,0
+        dc.w    msh_tower,1,3546,-3040,yb_tower,202<<8,0,0
+        dc.w    msh_block,1,-304,-2918,yb_block,136<<8,0,0
+        dc.w    msh_mine,1,-3152,-2828,cam_h,193<<8,0,0
+        dc.w    msh_mine,1,-3483,-2318,cam_h,27<<8,0,0
+        dc.w    msh_mine,1,-3519,-1620,cam_h,194<<8,0,0
+        dc.w    msh_mine,1,3546,-1535,cam_h,222<<8,0,0
+        dc.w    msh_block,1,-1230,-1533,yb_block,39<<8,0,0
+        dc.w    msh_mine,1,-8,-1444,cam_h,161<<8,0,0
+        dc.w    msh_mine,1,2136,-1315,cam_h,228<<8,0,0
+        dc.w    msh_mine,1,3458,64,cam_h,26<<8,0,0
+        dc.w    msh_mine,1,1882,177,cam_h,32<<8,0,0
+        dc.w    msh_tower,1,-3555,263,yb_tower,232<<8,0,0
+        dc.w    msh_mine,1,-1397,489,cam_h,202<<8,0,0
+        dc.w    msh_block,1,2146,1431,yb_block,245<<8,0,0
+        dc.w    msh_mine,1,3808,1562,cam_h,149<<8,0,0
+        dc.w    msh_tower,1,-3429,1594,yb_tower,229<<8,0,0
+        dc.w    msh_tower,1,-1754,1718,yb_tower,237<<8,0,0
+        dc.w    msh_block,1,-37,1726,yb_block,243<<8,0,0
+        dc.w    msh_block,1,-2862,3004,yb_block,30<<8,0,0
+        dc.w    msh_tower,1,3186,3238,yb_tower,57<<8,0,0
+        dc.w    msh_tower,1,523,3491,yb_tower,53<<8,0,0
+        dc.w    msh_mine,1,-1810,3658,cam_h,72<<8,0,0
+        dc.w    msh_tower,1,1649,3686,yb_tower,26<<8,0,0
+        dc.w    -1
+lv_8:                               ; sector 8: seed 95, 7 crystals, 36 entities
+        dc.w    msh_gen,1,220,2721,yb_gen,143<<8,0,150
+        dc.w    msh_gen,1,-1015,-2561,yb_gen,153<<8,0,300
+        dc.w    msh_gen,1,3595,-3827,yb_gen,41<<8,0,450
+        dc.w    msh_gen,1,-3660,-755,yb_gen,165<<8,0,600
+        dc.w    msh_gen,1,2504,1016,yb_gen,126<<8,0,750
+        dc.w    msh_gen,1,-2063,1179,yb_gen,167<<8,0,900
+        dc.w    msh_gen,1,1489,-2408,yb_gen,146<<8,0,1050
+        dc.w    msh_tower,1,1739,-3586,yb_tower,10<<8,0,0
+        dc.w    msh_block,1,-1711,-3424,yb_block,11<<8,0,0
+        dc.w    msh_mine,1,-2915,-3136,cam_h,244<<8,0,0
+        dc.w    msh_tower,1,3128,-2872,yb_tower,0<<8,0,0
+        dc.w    msh_tower,1,3512,-2872,yb_tower,0<<8,0,0
+        dc.w    msh_mine,1,-156,-2739,cam_h,237<<8,0,0
+        dc.w    msh_tower,1,3128,-2488,yb_tower,0<<8,0,0
+        dc.w    msh_tower,1,3512,-2488,yb_tower,0<<8,0,0
+        dc.w    msh_tower,1,3462,-1948,yb_tower,102<<8,0,0
+        dc.w    msh_mine,1,-1449,-1484,cam_h,78<<8,0,0
+        dc.w    msh_block,1,1649,-1483,yb_block,207<<8,0,0
+        dc.w    msh_mine,1,-2701,-1475,cam_h,189<<8,0,0
+        dc.w    msh_mine,1,237,-1420,cam_h,215<<8,0,0
+        dc.w    msh_mine,1,1608,-938,cam_h,128<<8,0,0
+        dc.w    msh_mine,1,-2757,-207,cam_h,218<<8,0,0
+        dc.w    msh_tower,1,1848,-53,yb_tower,85<<8,0,0
+        dc.w    msh_tower,1,3148,29,yb_tower,46<<8,0,0
+        dc.w    msh_mine,1,-1785,262,cam_h,27<<8,0,0
+        dc.w    msh_tower,1,-3154,1442,yb_tower,149<<8,0,0
+        dc.w    msh_block,1,1650,1704,yb_block,114<<8,0,0
+        dc.w    msh_tower,1,-179,1978,yb_tower,3<<8,0,0
+        dc.w    msh_mine,1,-1636,1986,cam_h,9<<8,0,0
+        dc.w    msh_mine,1,3419,2063,cam_h,229<<8,0,0
+        dc.w    msh_tower,1,-3587,3031,yb_tower,190<<8,0,0
+        dc.w    msh_block,1,2128,3065,yb_block,185<<8,0,0
+        dc.w    msh_block,1,-1612,3093,yb_block,126<<8,0,0
+        dc.w    msh_tower,1,3546,3103,yb_tower,228<<8,0,0
+        dc.w    msh_mine,1,-459,3444,cam_h,72<<8,0,0
+        dc.w    msh_mine,1,293,3742,cam_h,150<<8,0,0
+        dc.w    -1
+cap_1:  dc.b    'DESTROY THE 3 CRYSTALS',0
+cap_2:  dc.b    'THE CRYSTALS FIRE BACK',0
+cap_3:  dc.b    'GUNSHIPS JOIN IN',0
+cap_4:  dc.b    'MINEFIELD',0
+cap_5:  dc.b    'CRYSTALS TAKE 8 HITS',0
+cap_6:  dc.b    'THE SWARM',0
+cap_7:  dc.b    'SHARPSHOOTER CRYSTALS',0
+cap_8:  dc.b    'THE FORTRESS: 7 CRYSTALS',0
+cap_loop:
+        dc.b    'HARDER STILL',0
+        even

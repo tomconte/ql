@@ -152,8 +152,9 @@ title_screen:
         bra     key_wait            ; tail call
 
 ; --------------------------------------------------------------- sector card
-; sector_card: SECTOR n on a black screen 0 for card_f frames, and
-; under it the last sector's bonus when there is one (sector_next).
+; sector_card: SECTOR n on a black screen 0 for card_f frames, under it
+; the sector's caption (sec_cap: what it adds to the last), and under
+; that the last sector's bonus when there is one (sector_next).
 ; In:      none
 ; Out:     txtbuf, bonus cleared
 ; Trashes: d0-d5, a0-a2, a4, dtx_ws
@@ -171,6 +172,10 @@ sector_card:
         lea     txtbuf(pc),a0
         moveq   #104,d1
         bsr     big_white
+        lea     levels(pc),a0       ; THE CRYSTALS FIRE BACK
+        adda.w  sec_cap(pc),a0
+        move.w  #144,d1
+        bsr     med_green
         move.l  bonus(pc),d0
         beq.s   .nb
         lea     txtbuf(pc),a0       ; BONUS 2000
@@ -181,7 +186,7 @@ sector_card:
         moveq   #1,d1
         bsr     bcd_put
         lea     txtbuf(pc),a0
-        move.w  #144,d1
+        move.w  #168,d1
         bsr     med_green
         lea     bonus(pc),a0
         clr.l   (a0)

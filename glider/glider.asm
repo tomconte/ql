@@ -376,5 +376,8 @@ ds_size     equ     radtab+rad_nang*rad_stride
         if      ds_size>ds_avail
         fail    "DATASPACE in the Makefile is smaller than ds_size"
         endc
+        if      test_sect>=nsect
+        fail    "test_sect is past the last sector (levels.inc nsect)"
+        endc
         even
 ds_base:

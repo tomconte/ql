@@ -146,7 +146,8 @@ dly_cut:
 ; the alert range, the types launched in turn (offsets in gltypes), a
 ; crystal's hits, its fire range (0 = it holds its fire) and interval,
 ; the enemy shots' speed and life, the shield the next craft's start
-; adds (the warp's refill; then shield_max: a new craft starts full)
+; adds (the warp's refill; then shield_max: a new craft starts full),
+; the card's caption (its offset from levels)
 sec_rules:                          ; (each sized by the record's offsets,
 sec_own:                            ;   so the copy cannot get out of step)
         ds.b    sd_alert-sd_own
@@ -165,7 +166,9 @@ sec_esv:
 sec_esl:
         ds.b    sd_gain-sd_esl
 sec_gain:
-        ds.b    sd_size-sd_gain
+        ds.b    sd_cap-sd_gain
+sec_cap:
+        ds.b    sd_size-sd_cap
 bonus:  dc.l    0
 warp_t: dc.w    0
 warp_v: dc.w    0

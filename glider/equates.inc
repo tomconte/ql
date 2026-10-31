@@ -244,8 +244,9 @@ warp_max    equ     120
         if      warp_max>=latd/2
         fail    "the warp outruns the lattice (wagon-wheel): keep warp_max < latd/2"
         endc
-; sectors (levels.inc, tools/genlevel.py): after the last, the last again
-; with the launch delay cut by dly_step each time, down to dly_min
+; sectors (levels.inc, tools/genlevel.py): the ladder, then the loop's
+; harder lap; after its last, that lap again (from sect_loop) with the
+; launch delay cut by dly_step each time, down to dly_min
 dly_step    equ     50
 dly_min     equ     200
 over_f      equ     150             ; frames GAME OVER shows
@@ -298,6 +299,9 @@ test_shield equ     0
 ; test_warp: every sector starts with its crystals destroyed, so each
 ; warps a second in -- the warp, the cards and the tables, unattended
 test_warp   equ     0
+; test_sect: the sector a game starts in, its index in sec_dir (0 =
+; sector 1), for unattended runs and playing a late sector
+test_sect   equ     0
 
 ; craft state record offsets
 c_px        equ     0               ; long, 16.8 world x, 0..sector-1
@@ -408,7 +412,8 @@ sd_esv      equ     26              ; word, the enemy shots' speed (units a
 sd_esl      equ     28              ;   beat), their life (beats)
 sd_gain     equ     30              ; word, shield the warp into the
                                     ; sector restores (shield_max: full)
-sd_size     equ     32
+sd_cap      equ     32              ; word, its card's caption, from levels
+sd_size     equ     34
 
 ; explosion record (booms)
 bm_live     equ     0               ; word, beats left, 0 = free
