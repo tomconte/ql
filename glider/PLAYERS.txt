@@ -3,7 +3,7 @@ STARQLIDER 1.0                                              2026-10-31
 
 A first-person wireframe hovercraft raid for the Sinclair QL, written
 for a stock machine: 68008 at 7.5 MHz, 128K, mode 4. Developed for the
-Sinclair QL game jam of the Retro Programmers United for Obsolete
+Sinclair QL game jam of the Retro Programmers United for Obscure
 Systems (RPUFOS), Halloween 2026:
 
   https://itch.io/jam/rpufos-sinclair-ql

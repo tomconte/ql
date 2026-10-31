@@ -1,7 +1,7 @@
 # glider — STARQLIDER, a wireframe hovercraft raid
 
 STARQLIDER 1.0 (Halloween 2026) was developed for the Sinclair QL game
-jam of the Retro Programmers United for Obsolete Systems (RPUFOS):
+jam of the Retro Programmers United for Obscure Systems (RPUFOS):
 <https://itch.io/jam/rpufos-sinclair-ql>.
 
 A first-person raid over a flat, entirely artificial world, flown in a

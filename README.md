@@ -9,7 +9,7 @@ takeover demos with sound, double buffering and direct keyboard reads,
 then line drawing, a wireframe 3D engine, and the game it grew into:
 STARQLIDER, in [`glider/`](glider/README.md). STARQLIDER 1.0 was
 developed for the Sinclair QL game jam of the Retro Programmers United
-for Obsolete Systems (RPUFOS):
+for Obscure Systems (RPUFOS):
 <https://itch.io/jam/rpufos-sinclair-ql>.
 
 ## Prerequisites

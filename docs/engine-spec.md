@@ -1136,7 +1136,7 @@ Discord, and as a GitHub pre-release carrying the zip.
 ### 11.2 Release 1.0
 
 **Decided** 2026-10-30: the first public release, on GitHub and on an
-itch.io page for the Retro Programmers United for Obsolete Systems
+itch.io page for the Retro Programmers United for Obscure Systems
 game jam. The title stays STARQLIDER; the licence is MIT (the repo's
 `LICENSE`, shipped in the zip as `LICENSE.txt`). Checked by the user:
 a round at Gold Card speed on Q-emuLator plays fine (section 2.1); the
