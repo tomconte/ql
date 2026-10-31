@@ -718,7 +718,8 @@ runs once per beat (section 2.1).
   slow enough to see and slide out of (the drift is the dodge); they
   hit the player inside `craft_r` and are stopped by obstacles. Built
   in M3: 40 units a beat for 45 beats (range 1800; since 2026-10-30
-  the sector's speed, `sec_esv`, its life keeping the range), from 64
+  the sector's speed, `sec_esv`, its life keeping the range; a
+  crystal's reach longer since 2026-10-31, below), from 64
   ahead of
   the hull centre, drawn 48 long like the player's; the static world
   is cast at launch (`shot_cast`, now dividing by the shot's own
@@ -726,9 +727,10 @@ runs once per beat (section 2.1).
   `craft_r`). Each hit costs 1 shield.
 - **Crystals that shoot back** (**decided** 2026-10-30, after Beta 1:
   the sectors played too easy; `gens_fire`): a live crystal within
-  the sector's fire range (`sec_frng`: 1500 in sectors 2 and 3 --
-  inside the alert range, so its gliders are on the player too; 0 in
-  sector 1, whose crystals hold their fire) of the craft fires an
+  the sector's fire range (`sec_frng`: 1500 in sectors 2 and 3 as
+  built, inside the alert range, so its gliders were on the player
+  too; since 2026-10-31 2200 and more, below; 0 in sector 1, whose
+  crystals hold their fire) of the craft fires an
   enemy shot at it every `sec_fcd` beats (75), the first `gen_fwait`
   50 beats after a craft
   starts, counted only in range (out of range the timer holds). Aimed
@@ -745,6 +747,27 @@ runs once per beat (section 2.1).
   launches, so a shot leaves on a frame boundary. Cost: ~0.12 ms a
   frame per live crystal out of range (measured with the objects off:
   sector 1's three, 0.35 ms), plus ~1 ms per bolt on screen.
+- **Crystals outrange the craft** (**decided** 2026-10-31, the user:
+  at 1500 a crystal could be shot from beyond its range, and a fixed
+  gun should outreach a light craft). The player's shots move 24
+  beats of 80 and hit a crystal 96 from its centre: a reach of 2016.
+  A firing sector's `sec_frng` is now 2200 (2300 from sector 7 and on
+  most of the loop), which `gens_fire`'s estimate (up to 1 % long)
+  still fires from at 2178; the crystal's shots have their own life,
+  `sec_csl` (60 beats at speed 40), reaching 300 past `sec_frng`, so
+  backing off does not dodge them -- sliding across the line of fire
+  still does. The gliders' shots keep the range 1800. `genlevel.py`
+  asserts both limits: `sec_frng` / 1.01 clears the player's reach by
+  100, and the shots' path stays inside the world box (`r_active`
+  2560), whose entities `shot_cast` tests for cover. A shot fired from
+  2200 starts at 2040, inside the projection tables (`ztab` 2048):
+  drawn from its first frame, a 2-pixel red stub in the sight
+  growing as it comes. Checked unattended (2026-10-31), sector 2 with
+  the launches held off, the craft still and firing at crystal 1:
+  from 2100 no hit lands on it and its shots take the shield 8 to 0
+  in ~15 s; from 1950 it falls in under 5 s after one shot hits.
+  Soaks of sectors 6 and 8 (Up + Space): all four enemy shots in
+  flight in 1 of 90 one-second samples, so `neshots` stays 4.
 - **Glider-craft contact** (M3, `glider_bump`): the two swap the
   normal component of their relative velocity (equal masses), both
   are halved and both moves undone; a bump at `bump_v` or more costs
@@ -1126,7 +1149,7 @@ through them all with the values stepped up (built 2026-10-30, below;
 it replaced "the third again with a shorter delay"). The glider cap
 `ngl` stays: it is the frame budget's knob.
 
-**The sector record** (`sec_dir` in `levels.inc`, 34 bytes, the `sd_*`
+**The sector record** (`sec_dir` in `levels.inc`, 36 bytes, the `sd_*`
 layout in `equates.inc`; written by `tools/genlevel.py` from its `RULES`
 defaults and each sector's changes, which it range-checks):
 the table, the spawn point and the launch delay as before, then the
@@ -1140,9 +1163,10 @@ the card's caption (`sd_cap`, from `levels`):
 | `sd_alert` | `alert_r` 1800 | range inside which a patrolling glider attacks (under `lose_r`) |
 | `sd_mix` | the types in turn | 6 bytes: the types launched in turn (cycles of 1, 2, 3 or 6) |
 | `sd_ghp` | `od_hp` 5 | hits to destroy a crystal (its `e_hp` starts at 5 - this) |
-| `sd_frng` | `gen_frange` 1500 | range inside which a crystal fires; 0 = it never does |
+| `sd_frng` | `gen_frange` 1500 | range inside which a crystal fires (beyond the player's reach, section 7); 0 = it never does |
 | `sd_fcd` | `gen_fcd` 75 | beats between a crystal's shots |
-| `sd_esv`, `sd_esl` | `eshot_v` 40, `eshot_life` 45 | enemy shots' speed (units a beat) and life (genlevel: range 1800) |
+| `sd_esv`, `sd_esl` | `eshot_v` 40, `eshot_life` 45 | enemy shots' speed (units a beat) and a glider's shot's life (genlevel: range 1800) |
+| `sd_csl` | `eshot_life` 45 | a crystal's shot's life (genlevel: 300 past `sd_frng`) |
 | `sd_gain` | full | shield the warp into the sector restores |
 
 Checked unattended (2026-10-30) with throwaway values: each field
@@ -1159,18 +1183,18 @@ delay. Sectors 1-3 keep the Beta 1 tables.
 | sector | caption | what it adds | crystals | delay |
 | --- | --- | --- | --- | --- |
 | 1 | DESTROY THE 3 CRYSTALS | darts and wedges, silent crystals | 3 | 500 |
-| 2 | THE CRYSTALS FIRE BACK | `frange` 1500 | 4 | 450 |
+| 2 | THE CRYSTALS FIRE BACK | `frange` 2200 | 4 | 450 |
 | 3 | GUNSHIPS JOIN IN | kites in the mix | 5 | 420 |
 | 4 | MINEFIELD | 22 mines, few towers | 5 | 400 |
 | 5 | CRYSTALS TAKE 8 HITS | `ghp` 8 | 5 | 380 |
 | 6 | THE SWARM | `own` 3, `alert` 2400 | 6 | 320 |
-| 7 | SHARPSHOOTER CRYSTALS | `frange` 1800, `fcd` 45, `esv` 60 | 6 | 320 |
+| 7 | SHARPSHOOTER CRYSTALS | `frange` 2300, `fcd` 45, `esv` 60 | 6 | 320 |
 | 8 | THE FORTRESS: 7 CRYSTALS | a tower cluster, kite-heavy mix | 7 | 300 |
 
 Then sectors 9-16, HARDER STILL: the same tables, with `harder()`
 applied to each rung's rules: one more glider a crystal (at most
 `ngl`), alert +400 (at most 3000), two more hits, every crystal firing
-(sector 1's at 1500, the rest +300 up to 1800), shots half again as
+(sector 1's at 2200, the rest +100 up to 2300), shots half again as
 often (`fcd` x 2/3, at least 30), +10 shot speed (at most 80), 3 less
 shield at the warp (5), the launch delay 100 shorter (at least
 `dly_min`). After sector 16, `sector_next` goes back to the loop's
@@ -1228,7 +1252,8 @@ sequence (section 6).
 7); the difficulty work in the order record, then a ladder of sectors;
 the record's fields (section 11.2), sector 1's crystals silent; the
 ladder of eight with a caption per card, then the harder lap on a loop
-(section 11.2).
+(section 11.2); the crystals outrange the craft (2026-10-31, section
+7).
 
 **Open**:
 

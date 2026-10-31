@@ -74,20 +74,38 @@ SECTOR1 = [
 # patrolling glider attacks (alert; under lose_r 3500, where it gives
 # up), the types launched in turn (mix: MIX_N of them, so cycles of 1, 2,
 # 3 or 6), a crystal's hits (ghp), the range inside which it fires at
-# the craft (frange; 0 = it holds its fire) and the beats between its
-# shots (fcd), the enemy shots' speed (esv, units a beat; their life
-# keeps the range at ESHOT_RANGE), the shield the warp into the sector
-# restores (gain; SHIELD_MAX = full). These are the rules before
+# the craft (frange; 0 = it holds its fire, else it outranges the
+# player's shots: below) and the beats between its shots (fcd), the
+# enemy shots' speed (esv, units a beat; their life keeps a glider's
+# shot's range at ESHOT_RANGE and takes a crystal's CSHOT_OVER past
+# frange), the shield the warp into the sector restores (gain;
+# SHIELD_MAX = full). These are the rules before
 # sector 1: each sector's own dict is the change from the sector
 # before it, so the ladder's rules add up.
 RULES = dict(own=2, alert=1800, mix=("dart", "wedge", "kite") * 2, ghp=5,
-             frange=1500, fcd=75, esv=40, gain=8)
+             frange=2200, fcd=75, esv=40, gain=8)
 TYPES = ("dart", "wedge", "kite")   # types.inc, in order
 MIX_N = 6                           # equates.inc mix_n
 NGL, LOSE_R, SHIELD_MAX = 4, 3500, 8    # equates.inc
 DLY_MIN = 200                       # equates.inc dly_min
-ESHOT_RANGE = 1800
-SD_SIZE = 34                        # the record's bytes (equates.inc sd_*)
+ESHOT_RANGE = 1800                  # a glider's shot's reach
+SD_SIZE = 36                        # the record's bytes (equates.inc sd_*)
+
+# A firing crystal outranges the craft, a fixed gun against a light
+# one: the player's shots move (shot_life - 1) beats of shot_v and hit
+# a crystal at its collision radius from the centre; gens_fire's
+# distance reads up to 1 % long, so it fires from frange / 1.01 at the
+# least, which must clear that reach by OUTRANGE. Its shots fly
+# CSHOT_OVER past frange (gen_nose out from the centre, then life - 1
+# beats of esv), and their path must stay inside the world box
+# (R_ACTIVE, half-side) whose entities shot_cast tests for cover, the
+# craft being no nearer the centre than CRYSTAL_CRAD + CRAFT_R.
+SHOT_V, SHOT_LIFE = 80, 25          # equates.inc shot_v, shot_life
+CRYSTAL_CRAD, CRAFT_R = 96, 32      # meshes.inc od_crad, equates craft_r
+PLAYER_REACH = (SHOT_LIFE - 1) * SHOT_V + CRYSTAL_CRAD     # 2016
+OUTRANGE = 100
+CSHOT_OVER = 300
+GEN_NOSE, R_ACTIVE = 160, 2560      # equates.inc gen_nose, r_active
 CAPTION_MAX = 26                    # characters across the card (tx_med)
 FONT = set(" -./0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ")    # genfont.py
 
@@ -103,7 +121,7 @@ SECTORS = [
          rules=dict(frange=0, mix=("dart", "wedge") * 3)),
     dict(seed=23, towers=8, blocks=6, mines=9, gens=4, delay=450,
          cluster=(-1, 1), caption="THE CRYSTALS FIRE BACK",
-         rules=dict(frange=1500)),
+         rules=dict(frange=2200)),
     dict(seed=41, towers=7, blocks=6, mines=11, gens=5, delay=420,
          cluster=None, caption="GUNSHIPS JOIN IN",
          rules=dict(mix=("dart", "wedge", "kite") * 2)),
@@ -117,7 +135,7 @@ SECTORS = [
          rules=dict(own=3, alert=2400)),
     dict(seed=83, towers=9, blocks=5, mines=11, gens=6, delay=320,
          cluster=None, caption="SHARPSHOOTER CRYSTALS",
-         rules=dict(frange=1800, fcd=45, esv=60)),
+         rules=dict(frange=2300, fcd=45, esv=60)),
     dict(seed=95, towers=8, blocks=5, mines=12, gens=7, delay=300,
          cluster=(1, -1), caption="THE FORTRESS: 7 CRYSTALS",
          rules=dict(mix=("kite", "wedge", "kite", "dart", "kite", "wedge"))),
@@ -128,13 +146,14 @@ LOOP_CAPTION = "HARDER STILL"
 def harder(r, delay):
     """The loop's step: the same sector with everything stepped up --
     one more glider a crystal, an earlier alert, two more hits, every
-    crystal firing, from further, half again as often, faster shots,
-    3 less shield at the warp, a launch delay 100 shorter."""
+    crystal firing, from further (up to 2300), half again as often,
+    faster shots, 3 less shield at the warp, a launch delay 100
+    shorter."""
     return dict(r, own=min(r["own"] + 1, NGL),
                 alert=min(r["alert"] + 400, 3000),
                 ghp=r["ghp"] + 2,
-                frange=min(r["frange"] + 300, ESHOT_RANGE) if r["frange"]
-                else 1500,
+                frange=min(r["frange"] + 100, 2300) if r["frange"]
+                else 2200,
                 fcd=max(round(r["fcd"] * 2 / 3), 30),
                 esv=min(r["esv"] + 10, 80),
                 gain=max(r["gain"] - 3, 2)), max(delay - 100, DLY_MIN)
@@ -219,12 +238,23 @@ def rules(r):
     assert 0 < r["alert"] < LOSE_R, r
     assert len(r["mix"]) == MIX_N and set(r["mix"]) <= set(TYPES), r
     assert 1 <= r["ghp"] <= 1000, r
-    # (within the shots' reach, and under half a sector: nearest image)
-    assert r["frange"] == 0 or 300 <= r["frange"] <= ESHOT_RANGE, r
+    # (outranging the player, the shots' path in the world box: above)
+    assert r["frange"] == 0 or (
+        r["frange"] / 1.01 >= PLAYER_REACH + OUTRANGE
+        and r["frange"] + CSHOT_OVER - CRYSTAL_CRAD - CRAFT_R <= R_ACTIVE), r
     assert 1 <= r["fcd"] <= 32767, r
     assert 8 <= r["esv"] <= 120, r
     assert 0 <= r["gain"] <= SHIELD_MAX, r
     return r
+
+
+def lives(r):
+    """The enemy shots' lives in beats: a glider's ranges ESHOT_RANGE,
+    a crystal's reaches CSHOT_OVER past frange (0 when it holds its
+    fire)."""
+    csl = (math.ceil((r["frange"] + CSHOT_OVER - GEN_NOSE) / r["esv"]) + 1
+           if r["frange"] else 0)
+    return round(ESHOT_RANGE / r["esv"]), csl
 
 
 def build():
@@ -252,12 +282,12 @@ def emit(lap, loop):
     print("; brads), the launch delay in beats; the gliders a crystal keeps")
     print("; up, their alert range, the types launched in turn; a crystal's")
     print("; hits, fire range (0 = none), beats between its shots; the enemy")
-    print("; shots' speed and life; the shield the warp into it restores;")
-    print("; its card's caption, from levels. The ladder's sectors, then the")
-    print("; loop's: the same tables, harder, which sector_next goes back to")
-    print("; (sect_loop) after the last. Then the tables: mesh, flags, x, z,")
-    print("; centre height, heading, hits, timer (a crystal's first launch);")
-    print("; -1 ends one. Then the captions.")
+    print("; shots' speed and lives (a glider's, a crystal's); the shield the")
+    print("; warp into it restores; its card's caption, from levels. The")
+    print("; ladder's sectors, then the loop's: the same tables, harder, which")
+    print("; sector_next goes back to (sect_loop) after the last. Then the")
+    print("; tables: mesh, flags, x, z, centre height, heading, hits, timer (a")
+    print("; crystal's first launch); -1 ends one. Then the captions.")
     print(f"nsect       equ     {len(lap) + len(loop)}")
     print(f"sect_loop   equ     {len(lap)}")
     print("sec_dir:")
@@ -268,9 +298,9 @@ def emit(lap, loop):
         print(f"        dc.w    {r['own']},{r['alert']}")
         print("        dc.b    " + ",".join(f"gt_{t}-gltypes" for t in r["mix"]))
         print(f"        dc.w    {r['ghp']},{r['frange']},{r['fcd']},"
-              f"{r['esv']},{round(ESHOT_RANGE / r['esv'])},{r['gain']}")
+              f"{r['esv']},{','.join(map(str, lives(r)))},{r['gain']}")
         print(f"        dc.w    {cap}-levels")
-    assert SD_SIZE == 2 * 5 + 2 * 2 + MIX_N + 2 * 6 + 2
+    assert SD_SIZE == 2 * 5 + 2 * 2 + MIX_N + 2 * 7 + 2
     print(f"        ifne    sd_size-{SD_SIZE}")
     print('        fail    "levels.inc: a record is not sd_size (genlevel.py vs equates.inc)"')
     print("        endc")

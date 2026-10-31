@@ -468,13 +468,15 @@ glider_launch:
 
 ; --------------------------------------------------------------- eshot fire
 ; eshot_fire: an enemy shot from the glider's nose (eshot_nose ahead of
-; its centre) along its heading (eshot_go).
+; its centre) along its heading for a glider's shot's life (sec_esl:
+; eshot_go).
 ; In:      a0 = the glider
 ; Out:     carry clear: a shot fired (eshots, nelive, sfx_want); carry
 ;          set: all neshots in flight; ccr
 ; Trashes: d0-d3, a1, a3
 eshot_fire:
         movem.l d4-d5,-(sp)
+        move.w  sec_esl(pc),d0      ; its life
         move.w  g_s(a0),d1          ; s
         move.w  g_c(a0),d2          ; c
         move.w  d1,d4
@@ -491,10 +493,12 @@ eshot_fire:
 
 ; ----------------------------------------------------------------- eshot go
 ; eshot_go: an enemy shot, its head at (x, z), along the direction (s, c),
-; at the sector's speed (sec_esv units a beat) for its life (sec_esl
-; beats), red; the static entity it will stop at is cast at launch
-; (shot_cast), as for the player's shots.
-; In:      d1.w = s, d2.w = c (8.8), d4.w = x, d5.w = z (the head)
+; at the sector's speed (sec_esv units a beat) for its life (a glider's
+; sec_esl or a crystal's sec_csl beats), red; the static entity it will
+; stop at is cast at launch (shot_cast, which counts on the life), as
+; for the player's shots.
+; In:      d0.w = life (beats), d1.w = s, d2.w = c (8.8), d4.w = x,
+;          d5.w = z (the head)
 ; Out:     carry clear: a shot fired (eshots, nelive, sfx_want); carry
 ;          set: all neshots in flight; ccr
 ; Trashes: d0-d3, a1, a3
@@ -526,7 +530,7 @@ eshot_go:
         move.w  d2,sh_tz(a1)
         move.w  d4,sh_x(a1)
         move.w  d5,sh_z(a1)
-        move.w  sec_esl(pc),sh_life(a1)
+        move.w  d0,sh_life(a1)
         move.w  sec_esv(pc),sh_v(a1)
         lea     nelive(pc),a3
         addq.w  #1,(a3)
@@ -690,8 +694,10 @@ gen_step:
 ; the craft counts its fire timer (gen_ft, parallel to gens) down and,
 ; when it has run out, fires an enemy shot at the craft as it is now (no
 ; lead), its head gen_nose out from the centre (clear of the crystal's
-; own collision circle, which shot_cast would stop it on), then waits
-; sec_fcd beats; with all neshots in flight it tries again next frame.
+; own collision circle, which shot_cast would stop it on), for sec_csl
+; beats (genlevel: past sec_frng, which outreaches the player's shots),
+; then waits sec_fcd beats; with all neshots in flight it tries again
+; next frame.
 ; Out of range the timer holds; with sec_frng 0 (a sector whose
 ; crystals hold their fire) nothing happens. The distance d is
 ; max(|dx|,|dz|) or
@@ -769,6 +775,7 @@ gens_fire:
         add.w   e_z(a3),d5
         move.w  d1,d2               ; c
         move.w  d0,d1               ; s
+        move.w  sec_csl(pc),d0      ; a crystal's shot's life
         bsr     eshot_go
         bcs.s   .next               ; none free: again next frame
         move.w  sec_fcd(pc),(a2)

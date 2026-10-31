@@ -193,13 +193,16 @@ gen_spin    equ     64              ; 0.25 brad a beat: a turn in 20 s
 ; enemy shot at it every sec_fcd beats, the first gen_fwait beats
 ; (counted in range) after a craft starts; the head leaves gen_nose from
 ; the centre, clear of the crystal's collision circle (96) by more than
-; the shot's drawn length (eshot_len)
+; the shot's drawn length (eshot_len), and flies sec_csl beats: genlevel
+; makes the range outreach the player's shots and the shot reach 300
+; past it (a fixed gun outranges the craft)
 gen_fwait   equ     50
 gen_nose    equ     160
 ; enemy shots (spec 7): up to neshots in flight, at the sector's speed
 ; (sec_esv units a beat; 40 is slow enough to see and slide out of) for
-; its life (sec_esl beats: genlevel keeps the range at 1800), launched
-; eshot_nose ahead of the hull centre
+; their life (a glider's: sec_esl beats, genlevel keeps the range at
+; 1800; a crystal's: sec_csl), a glider's launched eshot_nose ahead of
+; its hull centre
 neshots     equ     4
 eshot_nose  equ     64
 eshot_len   equ     48              ; drawn length
@@ -409,11 +412,12 @@ sd_frng     equ     22              ; word, a crystal fires inside this
                                     ; (0 = never)
 sd_fcd      equ     24              ; word, beats between a crystal's shots
 sd_esv      equ     26              ; word, the enemy shots' speed (units a
-sd_esl      equ     28              ;   beat), their life (beats)
-sd_gain     equ     30              ; word, shield the warp into the
+sd_esl      equ     28              ;   beat), a glider's shot's life and
+sd_csl      equ     30              ;   a crystal's (beats)
+sd_gain     equ     32              ; word, shield the warp into the
                                     ; sector restores (shield_max: full)
-sd_cap      equ     32              ; word, its card's caption, from levels
-sd_size     equ     34
+sd_cap      equ     34              ; word, its card's caption, from levels
+sd_size     equ     36
 
 ; explosion record (booms)
 bm_live     equ     0               ; word, beats left, 0 = free

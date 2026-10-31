@@ -4,96 +4,96 @@
 ; brads), the launch delay in beats; the gliders a crystal keeps
 ; up, their alert range, the types launched in turn; a crystal's
 ; hits, fire range (0 = none), beats between its shots; the enemy
-; shots' speed and life; the shield the warp into it restores;
-; its card's caption, from levels. The ladder's sectors, then the
-; loop's: the same tables, harder, which sector_next goes back to
-; (sect_loop) after the last. Then the tables: mesh, flags, x, z,
-; centre height, heading, hits, timer (a crystal's first launch);
-; -1 ends one. Then the captions.
+; shots' speed and lives (a glider's, a crystal's); the shield the
+; warp into it restores; its card's caption, from levels. The
+; ladder's sectors, then the loop's: the same tables, harder, which
+; sector_next goes back to (sect_loop) after the last. Then the
+; tables: mesh, flags, x, z, centre height, heading, hits, timer (a
+; crystal's first launch); -1 ends one. Then the captions.
 nsect       equ     16
 sect_loop   equ     8
 sec_dir:
         dc.w    lv_1-levels,128,128,0,500         ; sector 1
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
-        dc.w    5,0,75,40,45,8
+        dc.w    5,0,75,40,45,0,8
         dc.w    cap_1-levels
         dc.w    lv_2-levels,128,128,0,450         ; sector 2
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
-        dc.w    5,1500,75,40,45,8
+        dc.w    5,2200,75,40,45,60,8
         dc.w    cap_2-levels
         dc.w    lv_3-levels,128,128,0,420         ; sector 3
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    5,1500,75,40,45,8
+        dc.w    5,2200,75,40,45,60,8
         dc.w    cap_3-levels
         dc.w    lv_4-levels,128,128,0,400         ; sector 4
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    5,1500,75,40,45,8
+        dc.w    5,2200,75,40,45,60,8
         dc.w    cap_4-levels
         dc.w    lv_5-levels,128,128,0,380         ; sector 5
         dc.w    2,1800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    8,1500,75,40,45,8
+        dc.w    8,2200,75,40,45,60,8
         dc.w    cap_5-levels
         dc.w    lv_6-levels,128,128,0,320         ; sector 6
         dc.w    3,2400
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    8,1500,75,40,45,8
+        dc.w    8,2200,75,40,45,60,8
         dc.w    cap_6-levels
         dc.w    lv_7-levels,128,128,0,320         ; sector 7
         dc.w    3,2400
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    8,1800,45,60,30,8
+        dc.w    8,2300,45,60,30,42,8
         dc.w    cap_7-levels
         dc.w    lv_8-levels,128,128,0,300         ; sector 8
         dc.w    3,2400
         dc.b    gt_kite-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_kite-gltypes,gt_wedge-gltypes
-        dc.w    8,1800,45,60,30,8
+        dc.w    8,2300,45,60,30,42,8
         dc.w    cap_8-levels
         dc.w    lv_1-levels,128,128,0,400         ; sector 9
         dc.w    3,2200
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
-        dc.w    7,1500,50,50,36,5
+        dc.w    7,2200,50,50,36,48,5
         dc.w    cap_loop-levels
         dc.w    lv_2-levels,128,128,0,350         ; sector 10
         dc.w    3,2200
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_dart-gltypes,gt_wedge-gltypes
-        dc.w    7,1800,50,50,36,5
+        dc.w    7,2300,50,50,36,50,5
         dc.w    cap_loop-levels
         dc.w    lv_3-levels,128,128,0,320         ; sector 11
         dc.w    3,2200
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    7,1800,50,50,36,5
+        dc.w    7,2300,50,50,36,50,5
         dc.w    cap_loop-levels
         dc.w    lv_4-levels,128,128,0,300         ; sector 12
         dc.w    3,2200
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    7,1800,50,50,36,5
+        dc.w    7,2300,50,50,36,50,5
         dc.w    cap_loop-levels
         dc.w    lv_5-levels,128,128,0,280         ; sector 13
         dc.w    3,2200
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    10,1800,50,50,36,5
+        dc.w    10,2300,50,50,36,50,5
         dc.w    cap_loop-levels
         dc.w    lv_6-levels,128,128,0,220         ; sector 14
         dc.w    4,2800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    10,1800,50,50,36,5
+        dc.w    10,2300,50,50,36,50,5
         dc.w    cap_loop-levels
         dc.w    lv_7-levels,128,128,0,220         ; sector 15
         dc.w    4,2800
         dc.b    gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_wedge-gltypes,gt_kite-gltypes
-        dc.w    10,1800,30,70,26,5
+        dc.w    10,2300,30,70,26,36,5
         dc.w    cap_loop-levels
         dc.w    lv_8-levels,128,128,0,200         ; sector 16
         dc.w    4,2800
         dc.b    gt_kite-gltypes,gt_wedge-gltypes,gt_kite-gltypes,gt_dart-gltypes,gt_kite-gltypes,gt_wedge-gltypes
-        dc.w    10,1800,30,70,26,5
+        dc.w    10,2300,30,70,26,36,5
         dc.w    cap_loop-levels
-        ifne    sd_size-34
+        ifne    sd_size-36
         fail    "levels.inc: a record is not sd_size (genlevel.py vs equates.inc)"
         endc
 levels:
